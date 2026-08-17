@@ -1,0 +1,30 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "calendar.header.nextMonth" : {
+      "comment" : "Accessibility label for the button that moves the calendar to the following month.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next month"
+          }
+        }
+      }
+    },
+    "calendar.header.previousMonth" : {
+      "comment" : "Accessibility label for the button that moves the calendar to the preceding month.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous month"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
