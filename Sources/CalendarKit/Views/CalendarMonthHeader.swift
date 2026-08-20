@@ -44,6 +44,9 @@ public struct CalendarMonthHeader: View {
       Text(verbatim: month.monthTitle)
         .fontWeight(.semibold)
         .contentTransition(.numericText())
+        // Scoped to the title, on the calendar's own curve: the digits morph without the
+        // rest of the header — or the caller's view — being dragged into the animation.
+        .animation(month.animation, value: month.monthTitle)
 
       Spacer()
 

@@ -24,7 +24,7 @@ import SwiftUI
 ///       .calendarCell { day in
 ///         Text(day.day?.formatted(.number) ?? "")
 ///       }
-///       .font(.callout)              // ordinary SwiftUI modifiers still apply
+///       .font(.callout)              // ordinary SwiftUI modifiers, after the calendar ones
 ///       .foregroundStyle(.primary)
 ///   }
 /// }
@@ -32,7 +32,11 @@ import SwiftUI
 ///
 /// The `currentDay` binding is both the month on screen and the anchor day inside it.
 /// Whatever moves it — a toolbar button, a date picker elsewhere in your app, a deep link
-/// — slides the grid in the direction of travel.
+/// — slides the grid in the direction of travel. That animation is scoped to the grid, so a
+/// change of your own landing in the same update is left alone.
+///
+/// Because the `calendar…` modifiers return `Self`, apply them before ordinary SwiftUI
+/// modifiers.
 ///
 /// ## Topics
 ///
@@ -126,7 +130,7 @@ public struct CalendarView: View {
   }
 
   private var proxy: CalendarProxy {
-    CalendarProxy(currentDay: day, calendar: calendar) { target in
+    CalendarProxy(currentDay: day, calendar: calendar, animation: animation) { target in
       navigate(to: target)
     }
   }
@@ -160,6 +164,11 @@ public struct CalendarView: View {
         .modifier(OptionalDrawingGroup(isEnabled: usesDrawingGroup))
         .id(day.month)
         .transition(monthTransition)
+        // Scoped to the grid rather than run through `withAnimation`, so a caller's own
+        // state changing in the same update is left alone. The value form is required
+        // here: a transition driven by an identity change needs an animated transaction
+        // at the point the value changes, which `animation(_:body:)` does not provide.
+        .animation(animation, value: day.month)
       }
 
       toolbarRows(for: .below)
@@ -182,22 +191,10 @@ public struct CalendarView: View {
   }
 
   private func navigate(to target: DateComponents) {
-    let direction = CalendarNavigationDirection(from: day, to: target)
-
-    guard let animation else {
-      navigationDirection = direction
-      currentDay = target
-      return
-    }
-
-    Task {
-      navigationDirection = direction
-      // Small delay to ensure the view picks up the direction before the transition runs.
-      try? await Task.sleep(for: .seconds(0.01))
-      withAnimation(animation) {
-        currentDay = target
-      }
-    }
+    // Both writes land in the same update, so the transition is built from the direction
+    // of the move that caused it. No `withAnimation`: the grid scopes its own animation.
+    navigationDirection = CalendarNavigationDirection(from: day, to: target)
+    currentDay = target
   }
 
   // MARK: - Adding chrome

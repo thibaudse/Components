@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 /// The state and the navigation actions of a ``CalendarView``, handed to every toolbar
 /// closure.
@@ -29,6 +29,7 @@ import Foundation
 /// - ``currentDay``
 /// - ``date``
 /// - ``calendar``
+/// - ``animation``
 /// - ``year``
 /// - ``month``
 /// - ``monthTitle``
@@ -55,15 +56,30 @@ public struct CalendarProxy {
   /// ``currentDay``, or the fallback passed to ``CalendarView/init(currentDay:calendar:)``.
   public let calendar: Calendar
 
+  /// The animation the calendar animates month changes with, as set by
+  /// ``CalendarView/calendarAnimation(_:)`` — `nil` when month changes are instant.
+  ///
+  /// Scope your own chrome's animation with it, so a title or a badge moves on the same
+  /// curve as the grid:
+  ///
+  /// ```swift
+  /// Text(month.monthTitle)
+  ///   .contentTransition(.numericText())
+  ///   .animation(month.animation, value: month.monthTitle)
+  /// ```
+  public let animation: Animation?
+
   private let navigate: (DateComponents) -> Void
 
   init(
     currentDay: DateComponents,
     calendar: Calendar,
+    animation: Animation?,
     navigate: @escaping (DateComponents) -> Void
   ) {
     self.currentDay = currentDay
     self.calendar = calendar
+    self.animation = animation
     self.navigate = navigate
   }
 

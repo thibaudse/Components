@@ -83,8 +83,8 @@ struct MonthPicker: View {
   `DateComponents`; column headings as `CalendarWeekday`.
 - **`CalendarProxy`** — what every toolbar closure receives: the visible month
   (`monthTitle`, `monthName`, `yearTitle`, `year`, `month`, `daysInMonth`,
-  `firstDayOfMonth`, `lastDayOfMonth`, `containsToday`) and the actions that move it
-  (`goToNextMonth()`, `goToPreviousYear()`, `goToToday()`, `go(to:)`, …).
+  `firstDayOfMonth`, `lastDayOfMonth`, `containsToday`, `animation`) and the actions that
+  move it (`goToNextMonth()`, `goToPreviousYear()`, `goToToday()`, `go(to:)`, …).
 - **`CalendarMonthHeader`** — the conventional title-plus-chevrons header, for when you
   don't want to build one: `.calendarToolbar { CalendarMonthHeader($0) }`.
 - **`InlineCalendarView`** — one row of days for widgets and list rows, drawing exactly
@@ -92,7 +92,8 @@ struct MonthPicker: View {
 - **Styling by inheritance** — there is no theme. The calendar draws unstyled text, so
   `.font()`, `.foregroundStyle()`, and `.tint()` applied to it reach the days, the weekday
   symbols, and your toolbars alike. `.calendarSpacing(rows:columns:weekdays:toolbars:)`
-  sets the gaps; `.calendarAnimation(_:)` and `.calendarTransition(_:)` set the motion; and
+  sets the gaps; `.calendarAnimation(_:)` and `.calendarTransition(_:)` set the motion —
+  scoped to the grid, so a month change never animates your state along with it; and
   `.calendarDrawingGroup(false)` opts out of flattening the grid when a cell needs a
   material or a shadow that must not be rasterized.
 - **Date helpers** — `DateComponents` month and year navigation, month layout, weekday

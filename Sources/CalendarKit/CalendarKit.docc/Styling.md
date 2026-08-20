@@ -72,6 +72,23 @@ CalendarView(currentDay: $currentDay)
 The calendar adds no padding around itself — it is content, so `padding(_:)` is yours to
 apply.
 
+## Modifier order
+
+The `calendar…` modifiers return a `CalendarView`, not `some View`, so they have to come
+before ordinary SwiftUI modifiers:
+
+```swift
+CalendarView(currentDay: $currentDay)
+  .calendarCell { … }          // ✅ calendar modifiers first
+  .calendarAnimation(.bouncy)
+  .font(.callout)              // then anything else
+  .padding()
+```
+
+Putting `.font(_:)` first is a compile error rather than a silent surprise — the calendar
+modifiers are simply not available on the result. Wrap the calendar in a view of your own
+when you want one configuration reused, as below.
+
 ## Control the motion
 
 Month changes animate with `.snappy(duration: 0.3)` and a directional slide that blurs and
@@ -86,9 +103,29 @@ CalendarView(currentDay: $currentDay)
 ```
 
 ``CalendarView/calendarTransition(_:)`` receives a ``CalendarNavigationDirection``, so an
-asymmetric transition can be built either way round. The direction is inferred from the
-days themselves, which means it is correct whether a toolbar button moved the binding or
-something else in your app did.
+asymmetric transition can be built either way round.
+
+The animation is **scoped to the grid**, not run through `withAnimation`. That matters when
+a month change coincides with a change of your own: your view keeps whatever animation you
+gave it — usually none — instead of being dragged onto the calendar's curve.
+
+```swift
+Button("Next month") {
+  month.goToNextMonth()
+  isExpanded = true          // snaps, as it would without the calendar
+}
+```
+
+To animate your own chrome on the calendar's curve, scope it yourself with
+``CalendarProxy/animation``:
+
+```swift
+Text(month.monthTitle)
+  .contentTransition(.numericText())
+  .animation(month.animation, value: month.monthTitle)
+```
+
+``CalendarMonthHeader`` does exactly that for its title.
 
 ## Rendering
 

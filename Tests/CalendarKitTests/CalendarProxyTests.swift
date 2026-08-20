@@ -26,7 +26,7 @@ private func makeProxy(
   let components = calendar.calendarDateComponents(from: date)
   let destination = Destination()
 
-  let proxy = CalendarProxy(currentDay: components, calendar: calendar) { target in
+  let proxy = CalendarProxy(currentDay: components, calendar: calendar, animation: nil) { target in
     destination.day = target
   }
 
@@ -83,8 +83,8 @@ struct ProxyStateTests {
     let today = calendar.today
     let destination = Destination()
 
-    let current = CalendarProxy(currentDay: today, calendar: calendar) { destination.day = $0 }
-    let other = CalendarProxy(currentDay: today.nextMonth, calendar: calendar) { destination.day = $0 }
+    let current = CalendarProxy(currentDay: today, calendar: calendar, animation: nil) { destination.day = $0 }
+    let other = CalendarProxy(currentDay: today.nextMonth, calendar: calendar, animation: nil) { destination.day = $0 }
 
     #expect(current.containsToday)
     #expect(!other.containsToday)

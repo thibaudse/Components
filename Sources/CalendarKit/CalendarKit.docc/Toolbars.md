@@ -41,6 +41,7 @@ Two consequences worth knowing up front:
 | ``CalendarProxy/firstDayOfMonth``, ``CalendarProxy/lastDayOfMonth`` | The month's bounds |
 | ``CalendarProxy/containsToday`` | Whether today is in view |
 | ``CalendarProxy/calendar`` | The calendar the grid resolved its layout with |
+| ``CalendarProxy/animation`` | The calendar's own animation, to scope yours to the same curve |
 
 | Moving it | |
 | --- | --- |
