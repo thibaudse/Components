@@ -40,6 +40,9 @@ directories — one repository, one dependency entry, one library per component.
 
 ## CalendarKit
 
+The calendar is the grid; the chrome is yours, added as toolbars that receive the
+calendar's state and actions.
+
 ```swift
 import CalendarKit
 import SwiftUI
@@ -50,7 +53,19 @@ struct MonthPicker: View {
 
   var body: some View {
     CalendarView(currentDay: $currentDay)
-      .withCellStyle { day in
+      .calendarToolbar { month in
+        HStack {
+          Text(month.monthName).font(.headline)
+          Text(month.yearTitle).foregroundStyle(.secondary)
+
+          Spacer()
+
+          Button("Previous", systemImage: "chevron.left", action: month.goToPreviousMonth)
+          Button("Next", systemImage: "chevron.right", action: month.goToNextMonth)
+        }
+        .labelStyle(.iconOnly)
+      }
+      .calendarCell { day in
         Button {
           selection = day
         } label: {
@@ -59,20 +74,26 @@ struct MonthPicker: View {
         }
         .buttonStyle(.plain)
       }
-      .calendarTheme(.default)
   }
 }
 ```
 
-- **`CalendarView`** — month grid with a header that pages between months, animated with
-  a directional slide. Cells come back to you as `DateComponents`.
+- **`CalendarView`** — the month grid and the weekday row, nothing else. Months slide in
+  the direction of travel whatever moves the binding. Days come back to you as
+  `DateComponents`; column headings as `CalendarWeekday`.
+- **`CalendarProxy`** — what every toolbar closure receives: the visible month
+  (`monthTitle`, `monthName`, `yearTitle`, `year`, `month`, `daysInMonth`,
+  `firstDayOfMonth`, `lastDayOfMonth`, `containsToday`) and the actions that move it
+  (`goToNextMonth()`, `goToPreviousYear()`, `goToToday()`, `go(to:)`, …).
+- **`CalendarMonthHeader`** — the conventional title-plus-chevrons header, for when you
+  don't want to build one: `.calendarToolbar { CalendarMonthHeader($0) }`.
 - **`InlineCalendarView`** — one row of days for widgets and list rows, drawing exactly
   the dates you hand it.
-- **`CalendarTheme`** — the colors, fonts, and spacing of the calendar chrome, injected
-  through the environment with `.calendarTheme(_:)`. Ships `.default` (adapts to light and
-  dark) and `.dark`.
-- **Date helpers** — `DateComponents` month navigation, month layout, weekday tests, and
-  chronological comparison.
+- **`CalendarTheme`** — colors, fonts, and spacing for what the calendar draws itself,
+  injected through the environment with `.calendarTheme(_:)`. Ships `.default` (adapts to
+  light and dark) and `.dark`.
+- **Date helpers** — `DateComponents` month and year navigation, month layout, weekday
+  tests, and chronological comparison.
 
 Full API reference and guides live in the DocC catalog — see below.
 

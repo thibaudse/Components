@@ -1,8 +1,16 @@
 import SwiftUI
 
 /// The direction a calendar is moving through time, used to pick a transition.
-enum NavigationDirection {
+enum NavigationDirection: Equatable {
   case backward, forward
+
+  /// The direction of travel between two days.
+  ///
+  /// Any move that is not backward counts as forward, including a move to the same day,
+  /// so a calendar never lacks a direction to animate with.
+  init(from current: DateComponents, to target: DateComponents) {
+    self = target < current ? .backward : .forward
+  }
 }
 
 private struct BlurModifier: ViewModifier {

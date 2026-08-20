@@ -4,9 +4,14 @@ Match the calendar chrome to your design system.
 
 ## Overview
 
-CalendarKit has no design system. Every color, font, and gap it draws comes from a
+CalendarKit has no design system. Every color, font, and gap *it* draws comes from a
 ``CalendarTheme`` in the environment, so adopting the component costs one theme value
 rather than a fork.
+
+The theme's reach is deliberately small, because most of a calendar's appearance is
+already yours: toolbars and cells you build are never themed. What is left is the weekday
+row, the fallback day numbers, the spacing between rows — and ``CalendarMonthHeader``, if
+you use it.
 
 Two presets ship with it:
 
@@ -47,11 +52,12 @@ RootView()
   .calendarTheme(.myApp)
 ```
 
-## Reach the theme from a cell
+## Reach the theme from a cell or a toolbar
 
-Cells built with ``CalendarView/withCellStyle(_:)`` are deliberately unthemed: you own
-their appearance. When you do want a cell to follow the surrounding chrome, read the
-theme from the environment:
+Cells built with ``CalendarView/calendarCell(_:)`` and toolbars built with
+``CalendarView/calendarToolbar(_:content:)`` are deliberately unthemed: you own their
+appearance. When you do want one to follow the calendar's own chrome, read the theme from
+the environment:
 
 ```swift
 struct DayCell: View {
@@ -72,17 +78,21 @@ struct DayCell: View {
 
 | Element | Color | Font |
 | --- | --- | --- |
-| Month and year title | ``CalendarTheme/Colors/monthTitle`` | ``CalendarTheme/Fonts/monthTitle`` |
 | Weekday symbols (month grid) | ``CalendarTheme/Colors/weekdaySymbol`` | ``CalendarTheme/Fonts/weekdaySymbol`` |
 | Weekday symbols (inline) | ``CalendarTheme/Colors/weekdaySymbol`` | ``CalendarTheme/Fonts/inlineWeekdaySymbol`` |
 | Default day numbers | ``CalendarTheme/Colors/dayNumber`` | ``CalendarTheme/Fonts/dayNumber`` |
-| Navigation chevrons | ``CalendarTheme/Colors/control``, ``CalendarTheme/Colors/controlDisabled`` | sized by ``CalendarTheme/Metrics/controlSize`` |
+| ``CalendarMonthHeader`` title | ``CalendarTheme/Colors/monthTitle`` | ``CalendarTheme/Fonts/monthTitle`` |
+| ``CalendarMonthHeader`` chevrons | ``CalendarTheme/Colors/control``, ``CalendarTheme/Colors/controlDisabled`` | sized by ``CalendarTheme/Metrics/controlSize`` |
 
-Layout is metrics only — ``CalendarTheme/Metrics/headerSpacing``,
+Layout is metrics only — ``CalendarTheme/Metrics/toolbarSpacing``,
 ``CalendarTheme/Metrics/weekdayRowSpacing``, ``CalendarTheme/Metrics/dayRowSpacing``,
 ``CalendarTheme/Metrics/controlSpacing``, ``CalendarTheme/Metrics/inlineWeekdaySpacing``,
-and ``CalendarTheme/Metrics/contentInsets``. There is no cell size to set: cells are
-always square and split the available width evenly, so size a calendar with `frame`.
+and ``CalendarTheme/Metrics/contentInsets``.
+
+Two things the theme deliberately does not do. There is no cell size to set: cells are
+always square and split the available width evenly, so size a calendar with `frame`. And
+``CalendarTheme/Metrics/contentInsets`` is zero by default — the calendar is the content,
+so padding it is your call.
 
 ## Topics
 

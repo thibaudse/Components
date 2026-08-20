@@ -31,13 +31,16 @@ let handmade = DateComponents(year: 2026, month: 8, day: 17) // ⚠️ no calend
 
 ## Move through time
 
-``Foundation/DateComponents/previousMonth`` and ``Foundation/DateComponents/nextMonth``
-are what the header chevrons write back to your binding. Both go through the calendar, so
-month lengths and leap years take care of themselves — the 31st of a month stepping into
-a 30-day month clamps rather than overflowing.
+``Foundation/DateComponents/previousMonth`` and ``Foundation/DateComponents/nextMonth`` are
+what ``CalendarProxy``'s navigation actions write back to your binding, and
+``Foundation/DateComponents/previousYear``/``Foundation/DateComponents/nextYear`` back its
+year actions. All of them go through the calendar, so month lengths and leap years take
+care of themselves — the 31st of a month stepping into a 30-day month clamps rather than
+overflowing, as does 29 February stepping into a common year.
 
 ```swift
 currentDay = currentDay.nextMonth
+currentDay = currentDay.nextYear
 currentDay = currentDay.previousDays(7)
 currentDay = currentDay.nextDays()
 ```
@@ -81,7 +84,7 @@ the `weekday` field, where Sunday is `1` no matter which day the calendar starts
 
 ```swift
 CalendarView(currentDay: $currentDay)
-  .withCellStyle { day in
+  .calendarCell { day in
     Text(day.day?.formatted(.number) ?? "")
       .foregroundStyle(day.isWeekend ? .secondary : .primary)
   }
@@ -131,6 +134,8 @@ Date.now.days(pastDays: 3, futureDays: 3)  // 7 dates, today in the middle
 
 - ``Foundation/DateComponents/previousMonth``
 - ``Foundation/DateComponents/nextMonth``
+- ``Foundation/DateComponents/previousYear``
+- ``Foundation/DateComponents/nextYear``
 - ``Foundation/DateComponents/previousDays(_:)``
 - ``Foundation/DateComponents/nextDays(_:)``
 - ``Foundation/DateComponents/with(year:month:day:)``

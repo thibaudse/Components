@@ -9,13 +9,13 @@ import SwiftUI
 ///
 /// ```swift
 /// InlineCalendarView(visibleDays: Date.now.days(pastDays: 3, futureDays: 3))
-///   .withCellStyle { date in
+///   .calendarCell { date in
 ///     Text(Calendar.current.component(.day, from: date).formatted(.number))
 ///   }
 ///   .frame(width: 156)
 /// ```
 ///
-/// Days have no default appearance: without ``withCellStyle(_:)`` you get the weekday
+/// Days have no default appearance: without ``calendarCell(_:)`` you get the weekday
 /// symbols above a row of empty squares.
 ///
 /// ## Topics
@@ -24,7 +24,7 @@ import SwiftUI
 /// - ``init(visibleDays:calendar:)``
 ///
 /// ### Styling days
-/// - ``withCellStyle(_:)``
+/// - ``calendarCell(_:)``
 /// - ``CellStyle``
 ///
 /// ### Building a day range
@@ -73,11 +73,11 @@ public struct InlineCalendarView: View {
   /// Called once per day in ``init(visibleDays:calendar:)``. Each cell is laid out in a
   /// square that shares the row width equally.
   ///
-  /// - Parameter style: A closure receiving the day's date and returning its view.
-  public func withCellStyle(_ style: @escaping CellStyle<some View>) -> Self {
+  /// - Parameter cell: A closure receiving the day's date and returning its view.
+  public func calendarCell(@ViewBuilder _ cell: @escaping CellStyle<some View>) -> Self {
     var copy = self
     copy.cellStyle = { date in
-      AnyView(style(date))
+      AnyView(cell(date))
     }
     return copy
   }
@@ -135,7 +135,7 @@ private struct InlineCalendarDays: View {
 
 #Preview {
   InlineCalendarView(visibleDays: Date.now.days(pastDays: 3, futureDays: 2))
-    .withCellStyle { date in
+    .calendarCell { date in
       Text(verbatim: Calendar.autoupdatingCurrent.component(.day, from: date).formatted(.number))
         .font(.system(size: 17, weight: .medium))
         .foregroundStyle(.white)

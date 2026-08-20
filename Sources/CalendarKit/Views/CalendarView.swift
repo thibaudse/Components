@@ -1,59 +1,78 @@
 import SwiftUI
 
-/// A month grid with a header that pages between months.
+/// A month grid, and nothing else.
 ///
-/// `CalendarView` draws the chrome — the month title, the navigation chevrons, the
-/// weekday symbols, and a square grid of day cells — and hands each day back to you as
-/// `DateComponents` so you decide what a day looks like:
+/// The calendar draws days. It does not draw a title, chevrons, or any other chrome —
+/// those are yours, added as toolbars and given everything they need through a
+/// ``CalendarProxy``:
 ///
 /// ```swift
-/// struct MonthPicker: View {
+/// struct MonthView: View {
 ///   @State private var currentDay = Calendar.autoupdatingCurrent.today
-///   @State private var selection: DateComponents?
 ///
 ///   var body: some View {
 ///     CalendarView(currentDay: $currentDay)
-///       .withCellStyle { day in
-///         Button {
-///           selection = day
-///         } label: {
-///           Text(day.day?.formatted(.number) ?? "")
-///             .foregroundStyle(day == selection ? .white : .primary)
+///       .calendarToolbar { month in
+///         HStack {
+///           Text(month.monthTitle)
+///             .font(.headline)
+///
+///           Spacer()
+///
+///           Button("Previous", systemImage: "chevron.left", action: month.goToPreviousMonth)
+///           Button("Next", systemImage: "chevron.right", action: month.goToNextMonth)
 ///         }
+///       }
+///       .calendarCell { day in
+///         Text(day.day?.formatted(.number) ?? "")
 ///       }
 ///   }
 /// }
 /// ```
 ///
 /// The `currentDay` binding is both the month on screen and the anchor day inside it.
-/// Tapping a chevron writes the same day in the neighbouring month back to the binding,
-/// which is what drives the sliding transition.
+/// Whatever moves it — a toolbar button, a date picker elsewhere in your app, a deep link
+/// — slides the grid in the direction of travel.
 ///
 /// ## Topics
 ///
 /// ### Creating a calendar
 /// - ``init(currentDay:calendar:)``
 ///
-/// ### Styling days
-/// - ``withCellStyle(_:)``
-/// - ``CellStyle``
+/// ### Adding chrome
+/// - ``calendarToolbar(_:content:)``
+/// - ``CalendarProxy``
+/// - ``CalendarToolbarPlacement``
 ///
-/// ### Configuring the header
-/// - ``withMonthTitle(_:)``
-/// - ``backwardDisabled(_:)``
-/// - ``forwardDisabled(_:)``
+/// ### Styling the grid
+/// - ``calendarCell(_:)``
+/// - ``calendarWeekdaySymbol(_:)``
+/// - ``calendarWeekdays(_:)``
+/// - ``CalendarWeekday``
 public struct CalendarView: View {
-  /// A closure that builds the view for one day of the month.
+  /// A closure building the view for one day of the visible month.
   ///
-  /// The components passed in are fully populated and carry the calendar, so
-  /// `day.day`, `day.weekday`, and helpers such as ``Foundation/DateComponents/isWeekend``
-  /// are all available.
+  /// The components are fully populated and carry the calendar, so `day.day`,
+  /// `day.weekday`, and helpers such as ``Foundation/DateComponents/isWeekend`` are all
+  /// available.
   public typealias CellStyle<Cell: View> = (_ dateComponents: DateComponents) -> Cell
 
+  /// A closure building the view for one column heading.
+  public typealias WeekdayStyle<Label: View> = (_ weekday: CalendarWeekday) -> Label
+
+  /// A closure building one toolbar row from the calendar's state and actions.
+  public typealias ToolbarContent<Content: View> = (_ month: CalendarProxy) -> Content
+
+  private struct Toolbar: Identifiable {
+    let id = UUID()
+    let placement: CalendarToolbarPlacement
+    let content: ToolbarContent<AnyView>
+  }
+
   private var cellStyle: CellStyle<AnyView>?
-  private var monthTitle: ((Date) -> String)?
-  private var backwardDisabled = false
-  private var forwardDisabled = false
+  private var weekdayStyle: WeekdayStyle<AnyView>?
+  private var weekdayVisibility: Visibility = .automatic
+  private var toolbars: [Toolbar] = []
 
   private let fallbackCalendar: Calendar
 
@@ -77,10 +96,6 @@ public struct CalendarView: View {
   }
 
   /// The day being displayed, guaranteed to carry a calendar.
-  ///
-  /// Every date helper resolves through the calendar attached to the components, so a
-  /// binding seeded with bare `DateComponents(year:month:day:)` would otherwise lay out
-  /// an empty month.
   private var day: DateComponents {
     guard currentDay.calendar == nil else { return currentDay }
 
@@ -88,194 +103,174 @@ public struct CalendarView: View {
     return fallbackCalendar.calendarDateComponents(from: date)
   }
 
+  private var calendar: Calendar {
+    day.calendar ?? fallbackCalendar
+  }
+
+  private var proxy: CalendarProxy {
+    CalendarProxy(currentDay: day, calendar: calendar) { target in
+      navigate(to: target)
+    }
+  }
+
   public var body: some View {
-    VStack(spacing: theme.metrics.headerSpacing) {
-      CalendarHeader(
-        title: title,
-        backwardDisabled: backwardDisabled,
-        forwardDisabled: forwardDisabled
-      )
-      .onGoBackward {
-        navigateMonth(to: .backward)
-      }
-      .onGoForward {
-        navigateMonth(to: .forward)
-      }
+    VStack(spacing: theme.metrics.toolbarSpacing) {
+      toolbarRows(for: .above)
 
       VStack(spacing: theme.metrics.weekdayRowSpacing) {
-        CalendarWeekdays(calendar: day.calendar ?? fallbackCalendar)
+        if weekdayVisibility != .hidden {
+          CalendarWeekdays(calendar: calendar, weekdayStyle: weekdayStyle)
+        }
 
         CalendarGrid(currentDay: day, cellStyle: cellStyle)
           .drawingGroup()
           .id(day.month)
           .transition(.month(direction: navigationDirection))
       }
+
+      toolbarRows(for: .below)
     }
     .padding(theme.metrics.contentInsets)
   }
 
-  private var title: String {
-    let day = day
-    let date = day.date ?? .now
+  @ViewBuilder
+  private func toolbarRows(for placement: CalendarToolbarPlacement) -> some View {
+    let rows = toolbars.filter { $0.placement == placement }
 
-    if let monthTitle {
-      return monthTitle(date)
-    }
+    if !rows.isEmpty {
+      let proxy = proxy
 
-    let calendar = day.calendar ?? fallbackCalendar
-    let style = Date.FormatStyle(
-      locale: calendar.locale ?? .autoupdatingCurrent,
-      calendar: calendar,
-      timeZone: calendar.timeZone
-    )
-    .month(.wide)
-    .year()
-
-    return date.formatted(style).localizedCapitalized
-  }
-
-  private func navigateMonth(to direction: NavigationDirection) {
-    Task {
-      navigationDirection = direction
-      // Small delay to ensure view updates navigation direction before transition
-      try? await Task.sleep(for: .seconds(0.01))
-      withAnimation(.snappy(duration: 0.3)) {
-        switch direction {
-          case .backward:
-            currentDay = day.previousMonth
-
-          case .forward:
-            currentDay = day.nextMonth
+      VStack(spacing: theme.metrics.toolbarSpacing) {
+        ForEach(rows) { row in
+          row.content(proxy)
         }
       }
     }
   }
+
+  private func navigate(to target: DateComponents) {
+    let direction = NavigationDirection(from: day, to: target)
+
+    Task {
+      navigationDirection = direction
+      // Small delay to ensure the view picks up the direction before the transition runs.
+      try? await Task.sleep(for: .seconds(0.01))
+      withAnimation(.snappy(duration: 0.3)) {
+        currentDay = target
+      }
+    }
+  }
+
+  // MARK: - Adding chrome
+
+  /// Adds a row of your own views above or below the grid, built from the calendar's
+  /// state and actions.
+  ///
+  /// This is where a month title, navigation controls, a year stepper, or a legend go.
+  /// Apply it more than once to stack rows; each keeps the placement it was given.
+  ///
+  /// ```swift
+  /// CalendarView(currentDay: $currentDay)
+  ///   .calendarToolbar { month in
+  ///     Text(month.monthTitle)
+  ///   }
+  ///   .calendarToolbar(.below) { month in
+  ///     Button("Today", action: month.goToToday)
+  ///       .disabled(month.containsToday)
+  ///   }
+  /// ```
+  ///
+  /// - Parameters:
+  ///   - placement: Whether the row sits ``CalendarToolbarPlacement/above`` the weekday
+  ///     symbols or ``CalendarToolbarPlacement/below`` the grid. Defaults to `.above`.
+  ///   - content: A closure receiving the calendar's ``CalendarProxy`` and returning the
+  ///     row's content.
+  public func calendarToolbar(
+    _ placement: CalendarToolbarPlacement = .above,
+    @ViewBuilder content: @escaping ToolbarContent<some View>
+  ) -> Self {
+    var copy = self
+    copy.toolbars.append(
+      Toolbar(placement: placement) { proxy in
+        AnyView(content(proxy))
+      }
+    )
+    return copy
+  }
+
+  // MARK: - Styling the grid
 
   /// Replaces the default day number with a view of your own.
   ///
   /// Called once per day of the visible month. Each cell is laid out in a square that
-  /// shares the grid width equally, so size your content relative to that square rather
-  /// than assuming a fixed point size.
+  /// shares the grid width equally, so size content relative to that square rather than
+  /// assuming a fixed point size.
   ///
-  /// - Parameter style: A closure receiving the day's components and returning its view.
-  public func withCellStyle(_ style: @escaping CellStyle<some View>) -> Self {
+  /// - Parameter cell: A closure receiving the day's components and returning its view.
+  public func calendarCell(@ViewBuilder _ cell: @escaping CellStyle<some View>) -> Self {
     var copy = self
     copy.cellStyle = { dateComponents in
-      AnyView(style(dateComponents))
+      AnyView(cell(dateComponents))
     }
     return copy
   }
 
-  /// Replaces the header's month and year title.
+  /// Replaces the column headings with views of your own.
   ///
-  /// By default the title is the wide month name and the year, formatted for the
-  /// calendar's locale. Override it for a different format or a fixed locale:
+  /// Called once per column, in the order the grid draws them — already rotated to the
+  /// calendar's first weekday.
   ///
-  /// ```swift
-  /// CalendarView(currentDay: $currentDay)
-  ///   .withMonthTitle { $0.formatted(.dateTime.month(.abbreviated).year()) }
-  /// ```
-  ///
-  /// - Parameter title: A closure receiving the first-of-month date currently shown.
-  public func withMonthTitle(_ title: @escaping (Date) -> String) -> Self {
+  /// - Parameter weekday: A closure receiving the column's ``CalendarWeekday`` and
+  ///   returning its label.
+  public func calendarWeekdaySymbol(@ViewBuilder _ weekday: @escaping WeekdayStyle<some View>) -> Self {
     var copy = self
-    copy.monthTitle = title
-    return copy
-  }
-
-  /// Disables the backward chevron, for example once the calendar reaches a lower bound.
-  /// - Parameter disabled: Whether to disable navigation to earlier months.
-  public func backwardDisabled(_ disabled: Bool = true) -> Self {
-    var copy = self
-    copy.backwardDisabled = disabled
-    return copy
-  }
-
-  /// Disables the forward chevron, for example once the calendar reaches an upper bound.
-  /// - Parameter disabled: Whether to disable navigation to later months.
-  public func forwardDisabled(_ disabled: Bool = true) -> Self {
-    var copy = self
-    copy.forwardDisabled = disabled
-    return copy
-  }
-}
-
-private struct CalendarHeader: View {
-  let title: String
-
-  private var goBackwardAction: (() -> Void)?
-  private var goForwardAction: (() -> Void)?
-  private var backwardDisabled: Bool
-  private var forwardDisabled: Bool
-
-  @Environment(\.calendarTheme) private var theme
-
-  init(title: String, backwardDisabled: Bool, forwardDisabled: Bool) {
-    self.title = title
-    self.backwardDisabled = backwardDisabled
-    self.forwardDisabled = forwardDisabled
-  }
-
-  var body: some View {
-    HStack(spacing: theme.metrics.controlSpacing) {
-      Text(verbatim: title)
-        .font(theme.fonts.monthTitle)
-        .foregroundStyle(theme.colors.monthTitle)
-        .contentTransition(.numericText())
-
-      Spacer()
-
-      if let goBackwardAction {
-        Button(action: goBackwardAction) {
-          chevron("chevron.left")
-        }
-        .buttonStyle(.calendarNavigation)
-        .disabled(backwardDisabled)
-        .accessibilityLabel(Text(.previousMonth))
-      }
-
-      if let goForwardAction {
-        Button(action: goForwardAction) {
-          chevron("chevron.right")
-        }
-        .buttonStyle(.calendarNavigation)
-        .disabled(forwardDisabled)
-        .accessibilityLabel(Text(.nextMonth))
-      }
+    copy.weekdayStyle = { value in
+      AnyView(weekday(value))
     }
-  }
-
-  private func chevron(_ systemName: String) -> some View {
-    Image(systemName: systemName)
-      .font(.system(size: theme.metrics.controlSize, weight: .semibold))
-  }
-
-  func onGoBackward(perform action: @escaping () -> Void) -> Self {
-    var copy = self
-    copy.goBackwardAction = action
     return copy
   }
 
-  func onGoForward(perform action: @escaping () -> Void) -> Self {
+  /// Shows or hides the column headings.
+  ///
+  /// Hide them when a toolbar of your own already labels the columns, or when the
+  /// calendar is small enough that they would not be legible.
+  ///
+  /// - Parameter visibility: `.hidden` removes the row; anything else keeps it.
+  public func calendarWeekdays(_ visibility: Visibility) -> Self {
     var copy = self
-    copy.goForwardAction = action
+    copy.weekdayVisibility = visibility
     return copy
   }
 }
 
 private struct CalendarWeekdays: View {
   let calendar: Calendar
+  let weekdayStyle: CalendarView.WeekdayStyle<AnyView>?
 
   @Environment(\.calendarTheme) private var theme
+
+  private var weekdays: [CalendarWeekday] {
+    calendar.localizedShortWeekdaySymbols.enumerated().map { offset, symbol in
+      CalendarWeekday(
+        symbol: symbol,
+        weekday: (calendar.firstWeekday - 1 + offset) % 7 + 1
+      )
+    }
+  }
 
   var body: some View {
     Grid(horizontalSpacing: 0) {
       GridRow {
-        ForEach(calendar.localizedShortWeekdaySymbols, id: \.self) { day in
-          Text(verbatim: day.localizedUppercase)
-            .font(theme.fonts.weekdaySymbol)
-            .foregroundStyle(theme.colors.weekdaySymbol)
-            .frame(maxWidth: .infinity)
+        ForEach(weekdays, id: \.self) { weekday in
+          if let weekdayStyle {
+            weekdayStyle(weekday)
+              .frame(maxWidth: .infinity)
+          } else {
+            Text(verbatim: weekday.symbol.localizedUppercase)
+              .font(theme.fonts.weekdaySymbol)
+              .foregroundStyle(theme.colors.weekdaySymbol)
+              .frame(maxWidth: .infinity)
+          }
         }
       }
     }
@@ -331,43 +326,64 @@ private struct CalendarGrid: View {
   }
 }
 
-private struct CalendarNavigationButtonStyle: ButtonStyle {
-  @Environment(\.isEnabled) private var isEnabled
-  @Environment(\.calendarTheme) private var theme
-
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .foregroundStyle(isEnabled ? theme.colors.control : theme.colors.controlDisabled)
-  }
-}
-
-private extension ButtonStyle where Self == CalendarNavigationButtonStyle {
-  static var calendarNavigation: CalendarNavigationButtonStyle {
-    CalendarNavigationButtonStyle()
-  }
-}
-
-#Preview("Default theme") {
+#Preview("Grid only") {
   @Previewable @State var currentDay = Calendar.autoupdatingCurrent.today
 
-  ScrollView {
-    CalendarView(currentDay: $currentDay)
-      .padding()
-  }
+  CalendarView(currentDay: $currentDay)
+    .padding()
 }
 
-#Preview("Dark theme, custom cells") {
+#Preview("With a month toolbar") {
   @Previewable @State var currentDay = Calendar.autoupdatingCurrent.today
 
-  ScrollView {
-    CalendarView(currentDay: $currentDay)
-      .withCellStyle { day in
-        Text(verbatim: day.day?.formatted(.number) ?? "")
-          .font(.system(size: 20, weight: .medium))
-          .foregroundStyle(day.isWeekend ? .white.opacity(0.4) : .white)
+  CalendarView(currentDay: $currentDay)
+    .calendarToolbar { month in
+      CalendarMonthHeader(month)
+    }
+    .calendarToolbar(.below) { month in
+      Button("Today", action: month.goToToday)
+        .disabled(month.containsToday)
+        .font(.footnote)
+    }
+    .padding()
+}
+
+#Preview("Toolbars and cells of your own") {
+  @Previewable @State var currentDay = Calendar.autoupdatingCurrent.today
+
+  CalendarView(currentDay: $currentDay)
+    .calendarToolbar { month in
+      HStack(spacing: 12) {
+        Button("Previous year", systemImage: "chevron.left.2", action: month.goToPreviousYear)
+          .labelStyle(.iconOnly)
+
+        Text(verbatim: month.monthName)
+          .font(.system(size: 20, weight: .bold, design: .rounded))
+
+        Text(verbatim: month.yearTitle)
+          .font(.system(size: 20, weight: .light, design: .rounded))
+          .foregroundStyle(.secondary)
+
+        Spacer()
+
+        Button("Next year", systemImage: "chevron.right.2", action: month.goToNextYear)
+          .labelStyle(.iconOnly)
       }
-      .padding()
-  }
-  .background(Color.black)
-  .calendarTheme(.dark)
+    }
+    .calendarWeekdaySymbol { weekday in
+      Text(verbatim: weekday.symbol.prefix(1).localizedUppercase)
+        .font(.footnote.weight(.bold))
+        .foregroundStyle(weekday.isWeekend ? .tertiary : .secondary)
+    }
+    .calendarCell { day in
+      Text(verbatim: day.day?.formatted(.number) ?? "")
+        .font(.system(size: 17, weight: .medium, design: .rounded))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+          if day.isWeekend {
+            Circle().fill(.quaternary)
+          }
+        }
+    }
+    .padding()
 }

@@ -27,6 +27,16 @@ public extension DateComponents {
     return adding(component: .month, value: 1)
   }
 
+  /// The same day one year earlier, clamped by the calendar on 29 February.
+  var previousYear: DateComponents {
+    return adding(component: .year, value: -1)
+  }
+
+  /// The same day one year later, clamped by the calendar on 29 February.
+  var nextYear: DateComponents {
+    return adding(component: .year, value: 1)
+  }
+
   /// The day a given number of days before this one.
   /// - Parameter amount: How many days to step back. Defaults to `1`.
   func previousDays(_ amount: Int = 1) -> DateComponents {

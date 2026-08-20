@@ -125,6 +125,18 @@ struct NavigationTests {
     #expect(february.day == 28)
   }
 
+  @Test("years step, clamping a leap day")
+  func yearNavigation() {
+    let august = day(2026, 8, 17)
+    #expect(august.nextYear.year == 2027)
+    #expect(august.nextYear.month == 8)
+    #expect(august.previousYear.year == 2025)
+
+    let leapDay = day(2024, 2, 29)
+    #expect(leapDay.nextYear.month == 2)
+    #expect(leapDay.nextYear.day == 28)
+  }
+
   @Test("day navigation crosses month boundaries")
   func dayNavigation() {
     let first = day(2026, 8, 1)

@@ -2,9 +2,12 @@ import SwiftUI
 
 /// The colors, fonts, and metrics used by ``CalendarView`` and ``InlineCalendarView``.
 ///
-/// CalendarKit ships without a design system of its own. Everything a calendar draws
-/// — the month title, the weekday symbols, the fallback day numbers, the navigation
-/// chevrons, and the spacing between them — is read from the theme in the environment.
+/// CalendarKit ships without a design system of its own. What the calendar draws for
+/// itself — the weekday symbols, the fallback day numbers, and the spacing between rows —
+/// is read from the theme in the environment, as is the optional
+/// ``CalendarMonthHeader``.
+///
+/// Toolbars and cells you build are never themed: you own those completely.
 ///
 /// Inject a theme with ``SwiftUICore/View/calendarTheme(_:)``:
 ///
@@ -21,8 +24,8 @@ import SwiftUI
 /// theme.colors.control = .accentColor
 /// ```
 ///
-/// Cells rendered by ``CalendarView/withCellStyle(_:)`` are *not* themed — you own
-/// their appearance completely. The theme only styles the chrome around them.
+/// Read the theme from the environment with `@Environment(\.calendarTheme)` when you want
+/// your own toolbar or cells to follow the same colors and fonts.
 public struct CalendarTheme: Sendable {
   /// The colors used for calendar chrome.
   public var colors: Colors
@@ -69,7 +72,7 @@ public struct CalendarTheme: Sendable {
 public extension CalendarTheme {
   /// The colors used for calendar chrome.
   struct Colors: Sendable {
-    /// The color of the month and year title in the header.
+    /// The color of ``CalendarMonthHeader``'s month and year title.
     public var monthTitle: Color
 
     /// The color of the weekday symbols above the grid (`MON`, `TUE`, …).
@@ -78,10 +81,10 @@ public extension CalendarTheme {
     /// The color of the day numbers drawn when no cell style is provided.
     public var dayNumber: Color
 
-    /// The color of the enabled navigation chevrons.
+    /// The color of ``CalendarMonthHeader``'s enabled chevrons.
     public var control: Color
 
-    /// The color of the navigation chevrons while they are disabled.
+    /// The color of ``CalendarMonthHeader``'s chevrons while they are disabled.
     public var controlDisabled: Color
 
     /// Creates a color set. Every parameter defaults to a semantic system color,
@@ -103,7 +106,7 @@ public extension CalendarTheme {
 
   /// The fonts used for calendar chrome.
   struct Fonts: Sendable {
-    /// The font of the month and year title in the header.
+    /// The font of ``CalendarMonthHeader``'s month and year title.
     public var monthTitle: Font
 
     /// The font of the weekday symbols above a ``CalendarView`` grid.
@@ -135,13 +138,14 @@ public extension CalendarTheme {
   /// Day cells are always square and share the available width equally, so there is
   /// no cell size to configure — set the calendar's own frame instead.
   struct Metrics: Sendable {
-    /// The vertical spacing between the header and the grid.
-    public var headerSpacing: CGFloat
+    /// The vertical spacing between toolbar rows, and between a toolbar and the grid.
+    public var toolbarSpacing: CGFloat
 
-    /// The horizontal spacing between the title and the navigation chevrons.
+    /// The horizontal spacing inside ``CalendarMonthHeader``, between its title and its
+    /// chevrons.
     public var controlSpacing: CGFloat
 
-    /// The point size of the navigation chevrons.
+    /// The point size of ``CalendarMonthHeader``'s chevrons.
     public var controlSize: CGFloat
 
     /// The vertical spacing between the weekday symbols and the first row of days.
@@ -150,7 +154,9 @@ public extension CalendarTheme {
     /// The vertical spacing between rows of days.
     public var dayRowSpacing: CGFloat
 
-    /// The insets applied around the whole ``CalendarView``.
+    /// The insets applied around the whole ``CalendarView``, toolbars included.
+    ///
+    /// Zero by default: the calendar is the content, so padding it is the caller's call.
     public var contentInsets: EdgeInsets
 
     /// The horizontal spacing between weekday symbols in an ``InlineCalendarView``.
@@ -158,15 +164,15 @@ public extension CalendarTheme {
 
     /// Creates a metrics set.
     public init(
-      headerSpacing: CGFloat = 12,
+      toolbarSpacing: CGFloat = 12,
       controlSpacing: CGFloat = 16,
       controlSize: CGFloat = 16,
       weekdayRowSpacing: CGFloat = 4,
       dayRowSpacing: CGFloat = 8,
-      contentInsets: EdgeInsets = EdgeInsets(top: 16, leading: 12, bottom: 16, trailing: 12),
+      contentInsets: EdgeInsets = EdgeInsets(),
       inlineWeekdaySpacing: CGFloat = 2
     ) {
-      self.headerSpacing = headerSpacing
+      self.toolbarSpacing = toolbarSpacing
       self.controlSpacing = controlSpacing
       self.controlSize = controlSize
       self.weekdayRowSpacing = weekdayRowSpacing

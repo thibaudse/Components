@@ -6,13 +6,16 @@ Calendar views for SwiftUI that draw the chrome and leave the days to you.
 
 CalendarKit gives you two views and the date plumbing behind them:
 
-- ``CalendarView`` — a month grid with a header that pages between months.
+- ``CalendarView`` — a month grid, and only the grid.
 - ``InlineCalendarView`` — a single row of days for widgets and list rows.
 
-Neither view decides what a day looks like. You pass a cell style, receive each day, and
-return any view — a plain number, a ring, a dot, a button. Everything around the days is
-themed through ``CalendarTheme``, so the component carries no design system of its own
-and no dependencies at all.
+Neither view decides what a day looks like, and neither draws chrome. Days come back to
+you through ``CalendarView/calendarCell(_:)`` — return any view, a plain number, a ring, a
+dot, a button. Titles and controls go on as toolbars through
+``CalendarView/calendarToolbar(_:content:)``, each one handed a ``CalendarProxy`` with the
+visible month and the actions that move it. What little the calendar draws for itself is
+themed through ``CalendarTheme``, so the component carries no design system of its own and
+no dependencies at all.
 
 ```swift
 import CalendarKit
@@ -23,7 +26,14 @@ struct MonthView: View {
 
   var body: some View {
     CalendarView(currentDay: $currentDay)
-      .withCellStyle { day in
+      .calendarToolbar { month in
+        HStack {
+          Text(month.monthTitle)
+          Spacer()
+          Button("Next", action: month.goToNextMonth)
+        }
+      }
+      .calendarCell { day in
         Text(day.day?.formatted(.number) ?? "")
           .foregroundStyle(day.isWeekend ? .secondary : .primary)
       }
@@ -58,6 +68,13 @@ calendar. ``CalendarView`` falls back to the calendar passed to
 ``InlineCalendarView`` takes `Date` values instead, because the days it shows usually
 come from a range you already computed.
 
+### The calendar is the content
+
+A ``CalendarView`` is the grid. It has no built-in header, no navigation buttons, and no
+padding of its own, so it composes like any other view: put it in a card, a sheet, a
+popover, or a widget, and add exactly the chrome that context needs. Nothing is hidden
+behind a style enum, because nothing is built in.
+
 ## Topics
 
 ### Essentials
@@ -65,6 +82,13 @@ come from a range you already computed.
 - <doc:GettingStarted>
 - ``CalendarView``
 - ``InlineCalendarView``
+
+### Chrome
+
+- <doc:Toolbars>
+- ``CalendarProxy``
+- ``CalendarToolbarPlacement``
+- ``CalendarMonthHeader``
 
 ### Appearance
 
