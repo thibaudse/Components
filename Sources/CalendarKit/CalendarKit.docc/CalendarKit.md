@@ -14,8 +14,8 @@ you through ``CalendarView/calendarCell(_:)`` — return any view, a plain numbe
 dot, a button. Titles and controls go on as toolbars through
 ``CalendarView/calendarToolbar(_:content:)``, each one handed a ``CalendarProxy`` with the
 visible month and the actions that move it. What little the calendar draws for itself is
-themed through ``CalendarTheme``, so the component carries no design system of its own and
-no dependencies at all.
+unstyled text, so your fonts and colors reach it through ordinary SwiftUI modifiers. There
+is no theme, no design system, and no dependencies at all.
 
 ```swift
 import CalendarKit
@@ -70,10 +70,10 @@ come from a range you already computed.
 
 ### The calendar is the content
 
-A ``CalendarView`` is the grid. It has no built-in header, no navigation buttons, and no
-padding of its own, so it composes like any other view: put it in a card, a sheet, a
-popover, or a widget, and add exactly the chrome that context needs. Nothing is hidden
-behind a style enum, because nothing is built in.
+A ``CalendarView`` is the grid. It has no built-in header, no navigation buttons, no
+colors, and no padding of its own, so it composes like any other view: put it in a card, a
+sheet, a popover, or a widget, and add exactly the chrome that context needs. Nothing is
+hidden behind a style enum, because nothing is built in.
 
 ## Topics
 
@@ -92,8 +92,7 @@ behind a style enum, because nothing is built in.
 
 ### Appearance
 
-- <doc:Theming>
-- ``CalendarTheme``
+- <doc:Styling>
 
 ### Dates
 

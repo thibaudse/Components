@@ -52,7 +52,8 @@ Two consequences worth knowing up front:
 ## Stacking rows
 
 Toolbars are additive. Apply the modifier more than once and each row is kept, in the
-order applied, with ``CalendarTheme/Metrics/toolbarSpacing`` between them. Pass
+order applied, with the `toolbars` gap of
+``CalendarView/calendarSpacing(rows:columns:weekdays:toolbars:)`` between them. Pass
 ``CalendarToolbarPlacement/below`` to put one under the grid:
 
 ```swift
@@ -116,25 +117,22 @@ can always drive the grid:
 
 ## Styling your toolbars
 
-Toolbars are never themed by ``CalendarTheme`` — they are your views, so they follow your
-design system. When you *do* want one to match the calendar's own chrome, read the theme
-from the environment:
+Toolbars are your views, so they follow your design system — nothing in CalendarKit styles
+them. They do sit inside the calendar's view tree, so anything you apply to the calendar as
+a whole reaches them too:
 
 ```swift
-struct MonthTitle: View {
-  @Environment(\.calendarTheme) private var theme
-  let month: CalendarProxy
-
-  var body: some View {
+CalendarView(currentDay: $currentDay)
+  .calendarToolbar { month in
     Text(month.monthTitle)
-      .font(theme.fonts.monthTitle)
-      .foregroundStyle(theme.colors.monthTitle)
   }
-}
+  .font(.callout)          // reaches the toolbar and the grid alike
+  .foregroundStyle(.white)
 ```
 
-``CalendarMonthHeader`` does exactly this, and is worth reading as a worked example — or
-using directly when the conventional header is all you need.
+``CalendarMonthHeader`` is built exactly this way — unstyled text and plain `Button`s,
+inheriting everything — and is worth reading as a worked example, or using directly when
+the conventional header is all you need.
 
 ## Topics
 

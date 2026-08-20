@@ -166,17 +166,17 @@ struct CalendarWeekdayTests {
 }
 
 @Suite("Transition direction")
-struct NavigationDirectionTests {
+struct CalendarNavigationDirectionTests {
   @Test("direction follows the order of the two days")
   func direction() {
     let calendar = gregorian()
     let august = calendar.calendarDateComponents(from: calendar.date(from: DateComponents(year: 2026, month: 8, day: 17))!)
 
-    #expect(NavigationDirection(from: august, to: august.nextMonth) == .forward)
-    #expect(NavigationDirection(from: august, to: august.previousMonth) == .backward)
-    #expect(NavigationDirection(from: august, to: august.nextYear) == .forward)
-    #expect(NavigationDirection(from: august, to: august.previousYear) == .backward)
+    #expect(CalendarNavigationDirection(from: august, to: august.nextMonth) == .forward)
+    #expect(CalendarNavigationDirection(from: august, to: august.previousMonth) == .backward)
+    #expect(CalendarNavigationDirection(from: august, to: august.nextYear) == .forward)
+    #expect(CalendarNavigationDirection(from: august, to: august.previousYear) == .backward)
     // A move that goes nowhere still yields a direction rather than nil.
-    #expect(NavigationDirection(from: august, to: august) == .forward)
+    #expect(CalendarNavigationDirection(from: august, to: august) == .forward)
   }
 }

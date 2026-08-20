@@ -45,8 +45,9 @@ struct MonthView: View {
 ```
 
 That is a grid of day numbers under a row of weekday symbols — and nothing else. There is
-no title and no chevrons, because the calendar does not decide what your chrome looks
-like. Moving the binding moves the month, so navigation is yours to trigger.
+no title and no chevrons, because the calendar does not decide what your chrome looks like;
+the text it does draw is unstyled, so it inherits your fonts and colors. Moving the binding
+moves the month, so navigation is yours to trigger.
 
 ## Add a toolbar
 
@@ -136,7 +137,10 @@ CalendarView(currentDay: $currentDay)
 ```
 
 ``CalendarView/calendarWeekdays(_:)`` takes a `Visibility`, so `.calendarWeekdays(.hidden)`
-drops the row entirely.
+drops the row entirely. The same two modifiers exist on ``InlineCalendarView``.
+
+Everything else about appearance — spacing, animation, dark surfaces — is in
+<doc:Styling>.
 
 ## Bound the range
 
@@ -211,5 +215,5 @@ CalendarView(currentDay: $currentDay)
 ## Next steps
 
 - <doc:Toolbars> — building chrome from the proxy.
-- <doc:Theming> — colors, fonts, and spacing for what the calendar draws itself.
+- <doc:Styling> — inheritance, the replacement modifiers, spacing, and motion.
 - <doc:WorkingWithDateComponents> — the date helpers the views are built on.

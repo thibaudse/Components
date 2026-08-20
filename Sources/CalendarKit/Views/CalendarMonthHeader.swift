@@ -13,14 +13,13 @@ import SwiftUI
 ///   }
 /// ```
 ///
-/// It styles itself from ``CalendarTheme``, and its chevrons carry localized
-/// accessibility labels.
+/// Like the calendar itself it carries no colors of its own, so it inherits yours. Its
+/// chevrons are `Button`s with localized accessibility labels, which means
+/// `buttonStyle(_:)`, `tint(_:)`, and `font(_:)` all reach them.
 public struct CalendarMonthHeader: View {
   private let month: CalendarProxy
   private let backwardDisabled: Bool
   private let forwardDisabled: Bool
-
-  @Environment(\.calendarTheme) private var theme
 
   /// Creates a month header for a calendar's proxy.
   ///
@@ -41,49 +40,26 @@ public struct CalendarMonthHeader: View {
   }
 
   public var body: some View {
-    HStack(spacing: theme.metrics.controlSpacing) {
+    HStack(spacing: 16) {
       Text(verbatim: month.monthTitle)
-        .font(theme.fonts.monthTitle)
-        .foregroundStyle(theme.colors.monthTitle)
+        .fontWeight(.semibold)
         .contentTransition(.numericText())
 
       Spacer()
 
       Button(action: month.goToPreviousMonth) {
-        chevron("chevron.left")
+        Image(systemName: "chevron.left")
       }
-      .buttonStyle(.calendarNavigation)
       .disabled(backwardDisabled)
       .accessibilityLabel(Text(.previousMonth))
 
       Button(action: month.goToNextMonth) {
-        chevron("chevron.right")
+        Image(systemName: "chevron.right")
       }
-      .buttonStyle(.calendarNavigation)
       .disabled(forwardDisabled)
       .accessibilityLabel(Text(.nextMonth))
     }
-  }
-
-  private func chevron(_ systemName: String) -> some View {
-    Image(systemName: systemName)
-      .font(.system(size: theme.metrics.controlSize, weight: .semibold))
-  }
-}
-
-private struct CalendarNavigationButtonStyle: ButtonStyle {
-  @Environment(\.isEnabled) private var isEnabled
-  @Environment(\.calendarTheme) private var theme
-
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .foregroundStyle(isEnabled ? theme.colors.control : theme.colors.controlDisabled)
-  }
-}
-
-private extension ButtonStyle where Self == CalendarNavigationButtonStyle {
-  static var calendarNavigation: CalendarNavigationButtonStyle {
-    CalendarNavigationButtonStyle()
+    .buttonStyle(.plain)
   }
 }
 

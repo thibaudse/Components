@@ -1,18 +1,5 @@
 import SwiftUI
 
-/// The direction a calendar is moving through time, used to pick a transition.
-enum NavigationDirection: Equatable {
-  case backward, forward
-
-  /// The direction of travel between two days.
-  ///
-  /// Any move that is not backward counts as forward, including a move to the same day,
-  /// so a calendar never lacks a direction to animate with.
-  init(from current: DateComponents, to target: DateComponents) {
-    self = target < current ? .backward : .forward
-  }
-}
-
 private struct BlurModifier: ViewModifier {
   let radius: CGFloat
 
@@ -22,11 +9,9 @@ private struct BlurModifier: ViewModifier {
 }
 
 extension AnyTransition {
-  /// A slide in the direction of travel, combined with a blur and a fade.
-  ///
-  /// Passing `nil` yields `.identity`, so the first month a calendar shows does not
-  /// animate in from an arbitrary edge.
-  static func month(direction: NavigationDirection?) -> AnyTransition {
+  /// The default month transition: a slide in the direction of travel, combined with a
+  /// blur and a fade. Replaceable with ``CalendarView/calendarTransition(_:)``.
+  static func month(direction: CalendarNavigationDirection) -> AnyTransition {
     let slide: AnyTransition = switch direction {
       case .forward:
         .asymmetric(
@@ -39,9 +24,6 @@ extension AnyTransition {
           insertion: .move(edge: .leading),
           removal: .move(edge: .trailing)
         )
-
-      case .none:
-        .identity
     }
 
     return slide

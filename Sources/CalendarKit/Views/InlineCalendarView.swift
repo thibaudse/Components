@@ -16,16 +16,24 @@ import SwiftUI
 /// ```
 ///
 /// Days have no default appearance: without ``calendarCell(_:)`` you get the weekday
-/// symbols above a row of empty squares.
+/// symbols above a row of empty squares. The symbols themselves are unstyled text, so
+/// fonts and colors inherit from the environment — at widget sizes you will want to say
+/// so explicitly.
 ///
 /// ## Topics
 ///
 /// ### Creating an inline calendar
 /// - ``init(visibleDays:calendar:)``
 ///
-/// ### Styling days
+/// ### Replacing what it draws
 /// - ``calendarCell(_:)``
+/// - ``calendarWeekdaySymbol(_:)``
+/// - ``calendarWeekdays(_:)``
 /// - ``CellStyle``
+/// - ``WeekdayStyle``
+///
+/// ### Laying it out
+/// - ``calendarSpacing(columns:weekdays:)``
 ///
 /// ### Building a day range
 /// - ``Foundation/Date/days(pastDays:futureDays:calendar:)``
@@ -33,12 +41,18 @@ public struct InlineCalendarView: View {
   /// A closure that builds the view for one visible day.
   public typealias CellStyle<Cell: View> = (_ date: Date) -> Cell
 
+  /// A closure that builds the heading above one visible day.
+  public typealias WeekdayStyle<Label: View> = (_ date: Date, _ weekday: CalendarWeekday) -> Label
+
   private var cellStyle: CellStyle<AnyView>?
+  private var weekdayStyle: WeekdayStyle<AnyView>?
+  private var weekdayVisibility: Visibility = .automatic
+
+  private var columnSpacing: CGFloat = 0
+  private var weekdaySpacing: CGFloat = 4
 
   private let visibleDays: [Date]
   private let calendar: Calendar
-
-  @Environment(\.calendarTheme) private var theme
 
   /// Creates an inline calendar for a set of days.
   ///
@@ -54,17 +68,21 @@ public struct InlineCalendarView: View {
   }
 
   public var body: some View {
-    VStack(spacing: theme.metrics.weekdayRowSpacing) {
-      InlineCalendarWeekdays(
-        visibleDays: visibleDays,
-        calendar: calendar
-      )
+    VStack(spacing: weekdaySpacing) {
+      if weekdayVisibility != .hidden {
+        InlineCalendarWeekdays(
+          visibleDays: visibleDays,
+          calendar: calendar,
+          columnSpacing: columnSpacing,
+          weekdayStyle: weekdayStyle
+        )
+      }
 
       InlineCalendarDays(
         visibleDays: visibleDays,
+        columnSpacing: columnSpacing,
         cellStyle: cellStyle
       )
-      .drawingGroup()
     }
   }
 
@@ -81,44 +99,88 @@ public struct InlineCalendarView: View {
     }
     return copy
   }
+
+  /// Replaces the headings above the days with views of your own.
+  ///
+  /// Called once per visible day, with that day's date and its ``CalendarWeekday`` — so a
+  /// heading can read "TODAY", or mark weekends, without recomputing the symbol.
+  ///
+  /// - Parameter weekday: A closure receiving the date and its weekday, returning the
+  ///   heading.
+  public func calendarWeekdaySymbol(@ViewBuilder _ weekday: @escaping WeekdayStyle<some View>) -> Self {
+    var copy = self
+    copy.weekdayStyle = { date, value in
+      AnyView(weekday(date, value))
+    }
+    return copy
+  }
+
+  /// Shows or hides the row of headings.
+  ///
+  /// - Parameter visibility: `.hidden` removes the row, leaving only the days; anything
+  ///   else keeps it.
+  public func calendarWeekdays(_ visibility: Visibility) -> Self {
+    var copy = self
+    copy.weekdayVisibility = visibility
+    return copy
+  }
+
+  /// Sets the gaps the row leaves between its own parts.
+  ///
+  /// Omitted values keep their defaults: 0 between columns, 4 between the headings and the
+  /// days.
+  ///
+  /// - Parameters:
+  ///   - columns: The horizontal gap between days, applied to the headings too.
+  ///   - weekdays: The gap between the headings and the days.
+  public func calendarSpacing(columns: CGFloat? = nil, weekdays: CGFloat? = nil) -> Self {
+    var copy = self
+    copy.columnSpacing = columns ?? columnSpacing
+    copy.weekdaySpacing = weekdays ?? weekdaySpacing
+    return copy
+  }
 }
 
 private struct InlineCalendarWeekdays: View {
   let visibleDays: [Date]
   let calendar: Calendar
-
-  @Environment(\.calendarTheme) private var theme
+  let columnSpacing: CGFloat
+  let weekdayStyle: InlineCalendarView.WeekdayStyle<AnyView>?
 
   var body: some View {
-    HStack(spacing: theme.metrics.inlineWeekdaySpacing) {
+    HStack(spacing: columnSpacing) {
       ForEach(visibleDays, id: \.self) { date in
-        Text(verbatim: symbol(for: date))
-          .font(theme.fonts.inlineWeekdaySymbol)
-          .textCase(.uppercase)
-          .foregroundStyle(theme.colors.weekdaySymbol)
-          .frame(maxWidth: .infinity)
+        if let weekdayStyle {
+          weekdayStyle(date, weekday(for: date))
+            .frame(maxWidth: .infinity)
+        } else {
+          Text(verbatim: weekday(for: date).symbol)
+            .frame(maxWidth: .infinity)
+        }
       }
     }
     .accessibilityHidden(true)
   }
 
-  private func symbol(for date: Date) -> String {
+  private func weekday(for date: Date) -> CalendarWeekday {
     let weekday = calendar.component(.weekday, from: date)
     let symbols = calendar.shortWeekdaySymbols
     let index = weekday - 1
 
-    guard symbols.indices.contains(index) else { return "" }
-
-    return symbols[index]
+    return CalendarWeekday(
+      symbol: symbols.indices.contains(index) ? symbols[index] : "",
+      weekday: weekday
+    )
   }
 }
 
 private struct InlineCalendarDays: View {
   let visibleDays: [Date]
+  let columnSpacing: CGFloat
   let cellStyle: InlineCalendarView.CellStyle<AnyView>?
 
   var body: some View {
-    HStack(spacing: 0) {
+    HStack(spacing: columnSpacing) {
       ForEach(visibleDays, id: \.self) { date in
         Color.clear
           .aspectRatio(1, contentMode: .fit)
@@ -135,6 +197,11 @@ private struct InlineCalendarDays: View {
 
 #Preview {
   InlineCalendarView(visibleDays: Date.now.days(pastDays: 3, futureDays: 2))
+    .calendarWeekdaySymbol { _, weekday in
+      Text(verbatim: weekday.symbol.localizedUppercase)
+        .font(.system(size: 7, weight: .medium))
+        .foregroundStyle(.white.opacity(0.4))
+    }
     .calendarCell { date in
       Text(verbatim: Calendar.autoupdatingCurrent.component(.day, from: date).formatted(.number))
         .font(.system(size: 17, weight: .medium))
@@ -143,5 +210,4 @@ private struct InlineCalendarDays: View {
     .frame(width: 156)
     .padding()
     .background(Color.black)
-    .calendarTheme(.dark)
 }

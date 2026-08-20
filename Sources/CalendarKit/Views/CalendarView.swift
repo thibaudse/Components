@@ -2,9 +2,10 @@ import SwiftUI
 
 /// A month grid, and nothing else.
 ///
-/// The calendar draws days. It does not draw a title, chevrons, or any other chrome —
-/// those are yours, added as toolbars and given everything they need through a
-/// ``CalendarProxy``:
+/// The calendar decides *where* things go — which square each day belongs in, how many
+/// rows the month needs, which column starts the week. Everything about how they *look*
+/// is yours: it draws unstyled text, so fonts and colors inherit from the environment
+/// like any other SwiftUI view, and each part has a modifier to replace it outright.
 ///
 /// ```swift
 /// struct MonthView: View {
@@ -15,10 +16,7 @@ import SwiftUI
 ///       .calendarToolbar { month in
 ///         HStack {
 ///           Text(month.monthTitle)
-///             .font(.headline)
-///
 ///           Spacer()
-///
 ///           Button("Previous", systemImage: "chevron.left", action: month.goToPreviousMonth)
 ///           Button("Next", systemImage: "chevron.right", action: month.goToNextMonth)
 ///         }
@@ -26,6 +24,8 @@ import SwiftUI
 ///       .calendarCell { day in
 ///         Text(day.day?.formatted(.number) ?? "")
 ///       }
+///       .font(.callout)              // ordinary SwiftUI modifiers still apply
+///       .foregroundStyle(.primary)
 ///   }
 /// }
 /// ```
@@ -44,11 +44,19 @@ import SwiftUI
 /// - ``CalendarProxy``
 /// - ``CalendarToolbarPlacement``
 ///
-/// ### Styling the grid
+/// ### Replacing what it draws
 /// - ``calendarCell(_:)``
 /// - ``calendarWeekdaySymbol(_:)``
 /// - ``calendarWeekdays(_:)``
 /// - ``CalendarWeekday``
+///
+/// ### Laying it out
+/// - ``calendarSpacing(rows:columns:weekdays:toolbars:)``
+///
+/// ### Animating month changes
+/// - ``calendarAnimation(_:)``
+/// - ``calendarTransition(_:)``
+/// - ``CalendarNavigationDirection``
 public struct CalendarView: View {
   /// A closure building the view for one day of the visible month.
   ///
@@ -74,13 +82,19 @@ public struct CalendarView: View {
   private var weekdayVisibility: Visibility = .automatic
   private var toolbars: [Toolbar] = []
 
+  private var rowSpacing: CGFloat = 8
+  private var columnSpacing: CGFloat = 0
+  private var weekdaySpacing: CGFloat = 4
+  private var toolbarSpacing: CGFloat = 12
+
+  private var animation: Animation? = .snappy(duration: 0.3)
+  private var transition: ((CalendarNavigationDirection) -> AnyTransition)?
+
   private let fallbackCalendar: Calendar
 
   @Binding private var currentDay: DateComponents
 
-  @Environment(\.calendarTheme) private var theme
-
-  @State private var navigationDirection: NavigationDirection?
+  @State private var navigationDirection: CalendarNavigationDirection?
 
   /// Creates a calendar bound to the day it should show.
   ///
@@ -113,24 +127,38 @@ public struct CalendarView: View {
     }
   }
 
+  /// `.identity` until the first navigation, so the calendar does not animate in from an
+  /// arbitrary edge when it first appears.
+  private var monthTransition: AnyTransition {
+    guard let navigationDirection else { return .identity }
+    return transition?(navigationDirection) ?? .month(direction: navigationDirection)
+  }
+
   public var body: some View {
-    VStack(spacing: theme.metrics.toolbarSpacing) {
+    VStack(spacing: toolbarSpacing) {
       toolbarRows(for: .above)
 
-      VStack(spacing: theme.metrics.weekdayRowSpacing) {
+      VStack(spacing: weekdaySpacing) {
         if weekdayVisibility != .hidden {
-          CalendarWeekdays(calendar: calendar, weekdayStyle: weekdayStyle)
+          CalendarWeekdays(
+            calendar: calendar,
+            columnSpacing: columnSpacing,
+            weekdayStyle: weekdayStyle
+          )
         }
 
-        CalendarGrid(currentDay: day, cellStyle: cellStyle)
-          .drawingGroup()
-          .id(day.month)
-          .transition(.month(direction: navigationDirection))
+        CalendarGrid(
+          currentDay: day,
+          rowSpacing: rowSpacing,
+          columnSpacing: columnSpacing,
+          cellStyle: cellStyle
+        )
+        .id(day.month)
+        .transition(monthTransition)
       }
 
       toolbarRows(for: .below)
     }
-    .padding(theme.metrics.contentInsets)
   }
 
   @ViewBuilder
@@ -140,7 +168,7 @@ public struct CalendarView: View {
     if !rows.isEmpty {
       let proxy = proxy
 
-      VStack(spacing: theme.metrics.toolbarSpacing) {
+      VStack(spacing: toolbarSpacing) {
         ForEach(rows) { row in
           row.content(proxy)
         }
@@ -149,13 +177,19 @@ public struct CalendarView: View {
   }
 
   private func navigate(to target: DateComponents) {
-    let direction = NavigationDirection(from: day, to: target)
+    let direction = CalendarNavigationDirection(from: day, to: target)
+
+    guard let animation else {
+      navigationDirection = direction
+      currentDay = target
+      return
+    }
 
     Task {
       navigationDirection = direction
       // Small delay to ensure the view picks up the direction before the transition runs.
       try? await Task.sleep(for: .seconds(0.01))
-      withAnimation(.snappy(duration: 0.3)) {
+      withAnimation(animation) {
         currentDay = target
       }
     }
@@ -198,9 +232,9 @@ public struct CalendarView: View {
     return copy
   }
 
-  // MARK: - Styling the grid
+  // MARK: - Replacing what it draws
 
-  /// Replaces the default day number with a view of your own.
+  /// Replaces the day number with a view of your own.
   ///
   /// Called once per day of the visible month. Each cell is laid out in a square that
   /// shares the grid width equally, so size content relative to that square rather than
@@ -230,10 +264,7 @@ public struct CalendarView: View {
     return copy
   }
 
-  /// Shows or hides the column headings.
-  ///
-  /// Hide them when a toolbar of your own already labels the columns, or when the
-  /// calendar is small enough that they would not be legible.
+  /// Shows or hides the row of column headings.
   ///
   /// - Parameter visibility: `.hidden` removes the row; anything else keeps it.
   public func calendarWeekdays(_ visibility: Visibility) -> Self {
@@ -241,13 +272,76 @@ public struct CalendarView: View {
     copy.weekdayVisibility = visibility
     return copy
   }
+
+  // MARK: - Laying it out
+
+  /// Sets the gaps the calendar leaves between its own parts.
+  ///
+  /// Omitted values keep their defaults: 8 between rows of days, 0 between columns, 4
+  /// between the weekday row and the grid, 12 between toolbar rows. The calendar adds no
+  /// padding around itself — use `padding(_:)` for that.
+  ///
+  /// - Parameters:
+  ///   - rows: The vertical gap between rows of days.
+  ///   - columns: The horizontal gap between columns, applied to the weekday row and the
+  ///     grid alike.
+  ///   - weekdays: The gap between the weekday row and the first row of days.
+  ///   - toolbars: The gap between toolbar rows, and between a toolbar and the grid.
+  public func calendarSpacing(
+    rows: CGFloat? = nil,
+    columns: CGFloat? = nil,
+    weekdays: CGFloat? = nil,
+    toolbars: CGFloat? = nil
+  ) -> Self {
+    var copy = self
+    copy.rowSpacing = rows ?? rowSpacing
+    copy.columnSpacing = columns ?? columnSpacing
+    copy.weekdaySpacing = weekdays ?? weekdaySpacing
+    copy.toolbarSpacing = toolbars ?? toolbarSpacing
+    return copy
+  }
+
+  // MARK: - Animating month changes
+
+  /// Sets the animation used when the month changes.
+  ///
+  /// Defaults to `.snappy(duration: 0.3)`. Pass `nil` to change months instantly.
+  ///
+  /// - Parameter animation: The animation to run, or `nil` for none.
+  public func calendarAnimation(_ animation: Animation?) -> Self {
+    var copy = self
+    copy.animation = animation
+    return copy
+  }
+
+  /// Replaces the transition the grid uses when the month changes.
+  ///
+  /// The default slides in the direction of travel, blurring and fading as it goes. The
+  /// closure receives that direction, so an asymmetric transition can be built either way
+  /// round:
+  ///
+  /// ```swift
+  /// CalendarView(currentDay: $currentDay)
+  ///   .calendarTransition { direction in
+  ///     .push(from: direction == .forward ? .trailing : .leading)
+  ///   }
+  /// ```
+  ///
+  /// - Parameter transition: A closure receiving the direction of travel and returning
+  ///   the transition to use.
+  public func calendarTransition(
+    _ transition: @escaping (CalendarNavigationDirection) -> AnyTransition
+  ) -> Self {
+    var copy = self
+    copy.transition = transition
+    return copy
+  }
 }
 
 private struct CalendarWeekdays: View {
   let calendar: Calendar
+  let columnSpacing: CGFloat
   let weekdayStyle: CalendarView.WeekdayStyle<AnyView>?
-
-  @Environment(\.calendarTheme) private var theme
 
   private var weekdays: [CalendarWeekday] {
     calendar.localizedShortWeekdaySymbols.enumerated().map { offset, symbol in
@@ -259,16 +353,14 @@ private struct CalendarWeekdays: View {
   }
 
   var body: some View {
-    Grid(horizontalSpacing: 0) {
+    Grid(horizontalSpacing: columnSpacing) {
       GridRow {
         ForEach(weekdays, id: \.self) { weekday in
           if let weekdayStyle {
             weekdayStyle(weekday)
               .frame(maxWidth: .infinity)
           } else {
-            Text(verbatim: weekday.symbol.localizedUppercase)
-              .font(theme.fonts.weekdaySymbol)
-              .foregroundStyle(theme.colors.weekdaySymbol)
+            Text(verbatim: weekday.symbol)
               .frame(maxWidth: .infinity)
           }
         }
@@ -280,9 +372,9 @@ private struct CalendarWeekdays: View {
 
 private struct CalendarGrid: View {
   let currentDay: DateComponents
+  let rowSpacing: CGFloat
+  let columnSpacing: CGFloat
   let cellStyle: CalendarView.CellStyle<AnyView>?
-
-  @Environment(\.calendarTheme) private var theme
 
   private var firstDayWeekday: Int {
     return currentDay.firstWeekdayOfMonth
@@ -297,7 +389,7 @@ private struct CalendarGrid: View {
   }
 
   var body: some View {
-    Grid(horizontalSpacing: 0, verticalSpacing: theme.metrics.dayRowSpacing) {
+    Grid(horizontalSpacing: columnSpacing, verticalSpacing: rowSpacing) {
       ForEach(0..<numberOfRows, id: \.self) { row in
         GridRow {
           ForEach(0..<7, id: \.self) { column in
@@ -313,8 +405,6 @@ private struct CalendarGrid: View {
                     cellStyle(component)
                   } else {
                     Text(verbatim: day.formatted(.number))
-                      .font(theme.fonts.dayNumber)
-                      .foregroundStyle(theme.colors.dayNumber)
                   }
                 }
               }
@@ -326,29 +416,30 @@ private struct CalendarGrid: View {
   }
 }
 
-#Preview("Grid only") {
+#Preview("Unstyled") {
   @Previewable @State var currentDay = Calendar.autoupdatingCurrent.today
 
   CalendarView(currentDay: $currentDay)
     .padding()
 }
 
-#Preview("With a month toolbar") {
+#Preview("Styled by inheritance") {
   @Previewable @State var currentDay = Calendar.autoupdatingCurrent.today
 
   CalendarView(currentDay: $currentDay)
     .calendarToolbar { month in
       CalendarMonthHeader(month)
     }
-    .calendarToolbar(.below) { month in
-      Button("Today", action: month.goToToday)
-        .disabled(month.containsToday)
-        .font(.footnote)
+    .calendarWeekdaySymbol { weekday in
+      Text(verbatim: weekday.symbol.localizedUppercase)
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.secondary)
     }
+    .font(.system(size: 17, weight: .medium))
     .padding()
 }
 
-#Preview("Toolbars and cells of your own") {
+#Preview("Fully custom") {
   @Previewable @State var currentDay = Calendar.autoupdatingCurrent.today
 
   CalendarView(currentDay: $currentDay)
@@ -385,5 +476,7 @@ private struct CalendarGrid: View {
           }
         }
     }
+    .calendarSpacing(rows: 12, weekdays: 8)
+    .calendarAnimation(.bouncy)
     .padding()
 }

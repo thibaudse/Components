@@ -7,7 +7,7 @@ dependencies.
 
 | Component | What it is | Platforms |
 | --- | --- | --- |
-| **CalendarKit** | A SwiftUI month grid that pages between months, plus a single-row inline calendar. You style the days; it draws everything else. | iOS 17+, macOS 14+ |
+| **CalendarKit** | A SwiftUI month grid, plus a single-row inline calendar. It places the days; you draw them, and the chrome around them. | iOS 17+, macOS 14+ |
 
 ## Installation
 
@@ -89,18 +89,42 @@ struct MonthPicker: View {
   don't want to build one: `.calendarToolbar { CalendarMonthHeader($0) }`.
 - **`InlineCalendarView`** — one row of days for widgets and list rows, drawing exactly
   the dates you hand it.
-- **`CalendarTheme`** — colors, fonts, and spacing for what the calendar draws itself,
-  injected through the environment with `.calendarTheme(_:)`. Ships `.default` (adapts to
-  light and dark) and `.dark`.
+- **Styling by inheritance** — there is no theme. The calendar draws unstyled text, so
+  `.font()`, `.foregroundStyle()`, and `.tint()` applied to it reach the days, the weekday
+  symbols, and your toolbars alike. `.calendarSpacing(rows:columns:weekdays:toolbars:)`
+  sets the gaps; `.calendarAnimation(_:)` and `.calendarTransition(_:)` set the motion.
 - **Date helpers** — `DateComponents` month and year navigation, month layout, weekday
   tests, and chronological comparison.
 
 Full API reference and guides live in the DocC catalog — see below.
 
+### Styling
+
+```swift
+CalendarView(currentDay: $currentDay)
+  .calendarWeekdaySymbol { weekday in
+    Text(weekday.symbol.prefix(1).localizedUppercase)
+      .font(.caption2.weight(.bold))
+      .foregroundStyle(weekday.isWeekend ? .tertiary : .secondary)
+  }
+  .calendarCell { day in
+    Text(day.day?.formatted(.number) ?? "")
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background { if day.isWeekend { Circle().fill(.quaternary) } }
+  }
+  .calendarSpacing(rows: 12, weekdays: 8)
+  .font(.system(size: 17, weight: .medium, design: .rounded))
+```
+
+Every part is either inherited from the environment or replaceable outright: days, column
+headings (or the whole row), chrome above and below, the gaps between them, and the
+month-change animation and transition. Nothing is hidden behind a style type.
+
 ### Localization
 
 Month names, weekday symbols, and day numbers are formatted from the calendar's locale.
-The only literal strings are the two accessibility labels on the navigation chevrons; they
+The only literal strings are the two accessibility labels on `CalendarMonthHeader`'s
+chevrons; they
 are `LocalizedStringResource` values resolved from the component's own string catalog
 (`Sources/CalendarKit/Resources/Localizable.xcstrings`), so they translate independently of
 the host app. Add a language by adding it to that catalog under
@@ -129,7 +153,7 @@ Package.swift                        one manifest, one library product per compo
 Sources/
   CalendarKit/
     Views/                           public views
-    Theme/                           theme value + environment plumbing
+    Model/                           proxy, weekday, placement, direction
     Extensions/                      public Calendar / DateComponents / Date helpers
     Internal/                        implementation details
     Resources/                       string catalog
@@ -144,8 +168,9 @@ Tests/
    `Package.swift`.
 2. Keep it self-contained: no dependency on another component and no third-party
    dependencies, so a consumer can adopt one component without inheriting the rest.
-3. Take styling from the caller — a theme value in the environment, or a closure — rather
-   than hardcoding a design system.
+3. Take styling from the caller: draw unstyled content so SwiftUI's environment reaches it,
+   and give every part it cannot infer a modifier that replaces it. No theme types, no
+   style enums, no design system.
 4. Localize any string the component displays: a `LocalizedStringResource` with an explicit
    key and default value, resolved from the component's own
    `Resources/Localizable.xcstrings` via `Bundle.module`. Prefer formatters over literals —
