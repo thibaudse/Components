@@ -35,6 +35,9 @@ import SwiftUI
 /// ### Laying it out
 /// - ``calendarSpacing(columns:weekdays:)``
 ///
+/// ### Tuning rendering
+/// - ``calendarDrawingGroup(_:)``
+///
 /// ### Building a day range
 /// - ``Foundation/Date/days(pastDays:futureDays:calendar:)``
 public struct InlineCalendarView: View {
@@ -50,6 +53,7 @@ public struct InlineCalendarView: View {
 
   private var columnSpacing: CGFloat = 0
   private var weekdaySpacing: CGFloat = 4
+  private var usesDrawingGroup = true
 
   private let visibleDays: [Date]
   private let calendar: Calendar
@@ -83,6 +87,7 @@ public struct InlineCalendarView: View {
         columnSpacing: columnSpacing,
         cellStyle: cellStyle
       )
+      .modifier(OptionalDrawingGroup(isEnabled: usesDrawingGroup))
     }
   }
 
@@ -137,6 +142,20 @@ public struct InlineCalendarView: View {
     var copy = self
     copy.columnSpacing = columns ?? columnSpacing
     copy.weekdaySpacing = weekdays ?? weekdaySpacing
+    return copy
+  }
+
+  /// Controls whether the row of days is rendered into an offscreen image before it is
+  /// drawn.
+  ///
+  /// On by default. Turn it off when a cell needs effects that cannot survive being
+  /// rasterized — a `Material` background, vibrancy, or a shadow falling outside the
+  /// cell's bounds.
+  ///
+  /// - Parameter isEnabled: Whether to flatten the row. Defaults to `true`.
+  public func calendarDrawingGroup(_ isEnabled: Bool = true) -> Self {
+    var copy = self
+    copy.usesDrawingGroup = isEnabled
     return copy
   }
 }

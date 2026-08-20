@@ -90,6 +90,26 @@ asymmetric transition can be built either way round. The direction is inferred f
 days themselves, which means it is correct whether a toolbar button moved the binding or
 something else in your app did.
 
+## Rendering
+
+The grid is flattened into a single offscreen layer with `drawingGroup()` before it is
+drawn. That is a measurable win on the month transition, which animates every cell at
+once, so it is on by default.
+
+The trade-off is that your cells are rasterized along with everything else, which some
+effects cannot survive — a `Material` background, vibrancy, or a shadow that falls outside
+a cell's bounds. Turn it off for those:
+
+```swift
+CalendarView(currentDay: $currentDay)
+  .calendarCell { day in
+    DayCell(day: day)      // draws a .regularMaterial background
+  }
+  .calendarDrawingGroup(false)
+```
+
+``InlineCalendarView/calendarDrawingGroup(_:)`` does the same for the inline row.
+
 ## Dark surfaces
 
 There is no dark preset to opt into, because there is nothing to preset: state the colors
@@ -167,3 +187,8 @@ struct AppCalendar: View {
 - ``CalendarView/calendarAnimation(_:)``
 - ``CalendarView/calendarTransition(_:)``
 - ``CalendarNavigationDirection``
+
+### Tuning rendering
+
+- ``CalendarView/calendarDrawingGroup(_:)``
+- ``InlineCalendarView/calendarDrawingGroup(_:)``

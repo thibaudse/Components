@@ -92,7 +92,9 @@ struct MonthPicker: View {
 - **Styling by inheritance** — there is no theme. The calendar draws unstyled text, so
   `.font()`, `.foregroundStyle()`, and `.tint()` applied to it reach the days, the weekday
   symbols, and your toolbars alike. `.calendarSpacing(rows:columns:weekdays:toolbars:)`
-  sets the gaps; `.calendarAnimation(_:)` and `.calendarTransition(_:)` set the motion.
+  sets the gaps; `.calendarAnimation(_:)` and `.calendarTransition(_:)` set the motion; and
+  `.calendarDrawingGroup(false)` opts out of flattening the grid when a cell needs a
+  material or a shadow that must not be rasterized.
 - **Date helpers** — `DateComponents` month and year navigation, month layout, weekday
   tests, and chronological comparison.
 

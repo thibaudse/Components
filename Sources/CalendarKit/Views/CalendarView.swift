@@ -57,6 +57,9 @@ import SwiftUI
 /// - ``calendarAnimation(_:)``
 /// - ``calendarTransition(_:)``
 /// - ``CalendarNavigationDirection``
+///
+/// ### Tuning rendering
+/// - ``calendarDrawingGroup(_:)``
 public struct CalendarView: View {
   /// A closure building the view for one day of the visible month.
   ///
@@ -89,6 +92,7 @@ public struct CalendarView: View {
 
   private var animation: Animation? = .snappy(duration: 0.3)
   private var transition: ((CalendarNavigationDirection) -> AnyTransition)?
+  private var usesDrawingGroup = true
 
   private let fallbackCalendar: Calendar
 
@@ -153,6 +157,7 @@ public struct CalendarView: View {
           columnSpacing: columnSpacing,
           cellStyle: cellStyle
         )
+        .modifier(OptionalDrawingGroup(isEnabled: usesDrawingGroup))
         .id(day.month)
         .transition(monthTransition)
       }
@@ -334,6 +339,32 @@ public struct CalendarView: View {
   ) -> Self {
     var copy = self
     copy.transition = transition
+    return copy
+  }
+
+  // MARK: - Tuning rendering
+
+  /// Controls whether the grid is rendered into an offscreen image before it is drawn.
+  ///
+  /// On by default, and worth leaving on: flattening the grid into one layer measurably
+  /// smooths the month transition, which animates every cell at once.
+  ///
+  /// The cost is that your cells are rasterized along with the rest. Turn it off when a
+  /// cell needs effects that cannot survive that — a `Material` background, vibrancy, a
+  /// shadow that falls outside the cell's bounds:
+  ///
+  /// ```swift
+  /// CalendarView(currentDay: $currentDay)
+  ///   .calendarCell { day in
+  ///     DayCell(day: day)   // draws a .regularMaterial background
+  ///   }
+  ///   .calendarDrawingGroup(false)
+  /// ```
+  ///
+  /// - Parameter isEnabled: Whether to flatten the grid. Defaults to `true`.
+  public func calendarDrawingGroup(_ isEnabled: Bool = true) -> Self {
+    var copy = self
+    copy.usesDrawingGroup = isEnabled
     return copy
   }
 }
