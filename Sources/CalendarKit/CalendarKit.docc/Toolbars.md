@@ -24,7 +24,7 @@ Two consequences worth knowing up front:
 
 - The proxy is rebuilt on every update, so its values always describe the month on screen.
 - Its actions write to the same binding you passed to
-  ``CalendarView/init(currentDay:calendar:)``, so a toolbar button and a date picker
+  ``CalendarView/init(currentDay:)``, so a toolbar button and a date picker
   elsewhere in your app move the calendar identically — and animate identically.
 
 ## What the proxy carries

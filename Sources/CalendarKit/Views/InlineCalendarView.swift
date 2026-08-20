@@ -23,7 +23,7 @@ import SwiftUI
 /// ## Topics
 ///
 /// ### Creating an inline calendar
-/// - ``init(visibleDays:calendar:)``
+/// - ``init(visibleDays:)``
 ///
 /// ### Replacing what it draws
 /// - ``calendarCell(_:)``
@@ -34,6 +34,7 @@ import SwiftUI
 ///
 /// ### Laying it out
 /// - ``calendarSpacing(columns:weekdays:)``
+/// - ``calendarCellAspectRatio(_:)``
 ///
 /// ### Tuning rendering
 /// - ``calendarDrawingGroup(_:)``
@@ -51,24 +52,27 @@ public struct InlineCalendarView: View {
   private var weekdayStyle: WeekdayStyle<AnyView>?
   private var weekdayVisibility: Visibility = .automatic
 
+  private var cellAspectRatio: CGFloat? = 1
   private var columnSpacing: CGFloat = 0
   private var weekdaySpacing: CGFloat = 4
   private var usesDrawingGroup = true
 
   private let visibleDays: [Date]
-  private let calendar: Calendar
+
+  /// SwiftUI's own calendar environment value, used to read each day's weekday.
+  @Environment(\.calendar) private var calendar
 
   /// Creates an inline calendar for a set of days.
   ///
-  /// - Parameters:
-  ///   - visibleDays: The days to draw, in the order they should appear. Each gets an
-  ///     equal share of the available width. ``Foundation/Date/days(pastDays:futureDays:calendar:)``
-  ///     builds a contiguous run for you.
-  ///   - calendar: The calendar used to read the weekday of each day. Defaults to
-  ///     `Calendar.autoupdatingCurrent`.
-  public init(visibleDays: [Date], calendar: Calendar = .autoupdatingCurrent) {
+  /// The calendar used to read each day's weekday comes from the environment — set
+  /// `\.calendar` to change it.
+  ///
+  /// - Parameter visibleDays: The days to draw, in the order they should appear. Each gets
+  ///   an equal share of the available width.
+  ///   ``Foundation/Date/days(pastDays:futureDays:calendar:)`` builds a contiguous run for
+  ///   you.
+  public init(visibleDays: [Date]) {
     self.visibleDays = visibleDays
-    self.calendar = calendar
   }
 
   public var body: some View {
@@ -80,10 +84,13 @@ public struct InlineCalendarView: View {
           columnSpacing: columnSpacing,
           weekdayStyle: weekdayStyle
         )
+        // Decoration when the view drew it; the caller's business when they did.
+        .accessibilityHidden(weekdayStyle == nil)
       }
 
       InlineCalendarDays(
         visibleDays: visibleDays,
+        cellAspectRatio: cellAspectRatio,
         columnSpacing: columnSpacing,
         cellStyle: cellStyle
       )
@@ -93,8 +100,8 @@ public struct InlineCalendarView: View {
 
   /// Sets the view drawn for each visible day.
   ///
-  /// Called once per day in ``init(visibleDays:calendar:)``. Each cell is laid out in a
-  /// square that shares the row width equally.
+  /// Called once per day in ``init(visibleDays:)``. Each cell is laid out in a square that
+  /// shares the row width equally.
   ///
   /// - Parameter cell: A closure receiving the day's date and returning its view.
   public func calendarCell(@ViewBuilder _ cell: @escaping CellStyle<some View>) -> Self {
@@ -145,6 +152,19 @@ public struct InlineCalendarView: View {
     return copy
   }
 
+  /// Sets the shape of each day's cell.
+  ///
+  /// `1` — the default — makes each day a square sharing the row width equally. Pass
+  /// another ratio for wider or taller cells, or `nil` to let the content decide the
+  /// height, which is what a row of pills or stacked labels wants.
+  ///
+  /// - Parameter ratio: Width divided by height, or `nil` to size by content.
+  public func calendarCellAspectRatio(_ ratio: CGFloat?) -> Self {
+    var copy = self
+    copy.cellAspectRatio = ratio
+    return copy
+  }
+
   /// Controls whether the row of days is rendered into an offscreen image before it is
   /// drawn.
   ///
@@ -178,7 +198,6 @@ private struct InlineCalendarWeekdays: View {
         }
       }
     }
-    .accessibilityHidden(true)
   }
 
   private func weekday(for date: Date) -> CalendarWeekday {
@@ -195,20 +214,20 @@ private struct InlineCalendarWeekdays: View {
 
 private struct InlineCalendarDays: View {
   let visibleDays: [Date]
+  let cellAspectRatio: CGFloat?
   let columnSpacing: CGFloat
   let cellStyle: InlineCalendarView.CellStyle<AnyView>?
 
   var body: some View {
     HStack(spacing: columnSpacing) {
       ForEach(visibleDays, id: \.self) { date in
-        Color.clear
-          .aspectRatio(1, contentMode: .fit)
-          .overlay {
-            if let cellStyle {
-              cellStyle(date)
-                .frame(maxWidth: .infinity)
-            }
+        CalendarCellContainer(aspectRatio: cellAspectRatio) {
+          if let cellStyle {
+            cellStyle(date)
+          } else {
+            Color.clear
           }
+        }
       }
     }
   }

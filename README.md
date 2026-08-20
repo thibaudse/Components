@@ -89,6 +89,10 @@ struct MonthPicker: View {
   don't want to build one: `.calendarToolbar { CalendarMonthHeader($0) }`.
 - **`InlineCalendarView`** — one row of days for widgets and list rows, drawing exactly
   the dates you hand it.
+- **The calendar comes from the environment** — `\.calendar` decides the first weekday,
+  the weekday symbols, the title's language, and the month lengths:
+  `.environment(\.calendar, mondayFirst)`. There is no calendar parameter to pass, and the
+  bound day is re-derived through it so nothing can disagree.
 - **Styling by inheritance** — there is no theme. The calendar draws unstyled text, so
   `.font()`, `.foregroundStyle()`, and `.tint()` applied to it reach the days, the weekday
   symbols, and your toolbars alike. `.calendarSpacing(rows:columns:weekdays:toolbars:)`

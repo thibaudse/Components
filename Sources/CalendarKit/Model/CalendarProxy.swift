@@ -52,8 +52,8 @@ public struct CalendarProxy {
   /// The day the calendar is bound to: the anchor whose month is on screen.
   public let currentDay: DateComponents
 
-  /// The calendar the view resolved its layout with — the one attached to
-  /// ``currentDay``, or the fallback passed to ``CalendarView/init(currentDay:calendar:)``.
+  /// The calendar the view resolved its layout with: SwiftUI's `\.calendar` environment
+  /// value, as seen by the calendar view.
   public let calendar: Calendar
 
   /// The animation the calendar animates month changes with, as set by
@@ -171,8 +171,8 @@ public struct CalendarProxy {
 
   /// Moves to an arbitrary day — for a date picker, a search result, a deep link.
   ///
-  /// - Parameter day: The day to show. Components carrying no calendar are resolved
-  ///   against ``calendar``.
+  /// - Parameter day: The day to show. Hand-built components need no calendar of their
+  ///   own — they are resolved against ``calendar``.
   public func go(to day: DateComponents) {
     guard day.calendar == nil else {
       navigate(day)

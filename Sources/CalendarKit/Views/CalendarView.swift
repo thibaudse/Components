@@ -30,6 +30,9 @@ import SwiftUI
 /// }
 /// ```
 ///
+/// The calendar it counts in comes from the environment: set `\.calendar` to change the
+/// first weekday, the locale, or the identifier.
+///
 /// The `currentDay` binding is both the month on screen and the anchor day inside it.
 /// Whatever moves it — a toolbar button, a date picker elsewhere in your app, a deep link
 /// — slides the grid in the direction of travel. That animation is scoped to the grid, so a
@@ -41,7 +44,7 @@ import SwiftUI
 /// ## Topics
 ///
 /// ### Creating a calendar
-/// - ``init(currentDay:calendar:)``
+/// - ``init(currentDay:)``
 ///
 /// ### Adding chrome
 /// - ``calendarToolbar(_:content:)``
@@ -56,6 +59,7 @@ import SwiftUI
 ///
 /// ### Laying it out
 /// - ``calendarSpacing(rows:columns:weekdays:toolbars:)``
+/// - ``calendarCellAspectRatio(_:)``
 ///
 /// ### Animating month changes
 /// - ``calendarAnimation(_:)``
@@ -89,6 +93,7 @@ public struct CalendarView: View {
   private var weekdayVisibility: Visibility = .automatic
   private var toolbars: [Toolbar] = []
 
+  private var cellAspectRatio: CGFloat? = 1
   private var rowSpacing: CGFloat = 8
   private var columnSpacing: CGFloat = 0
   private var weekdaySpacing: CGFloat = 4
@@ -98,35 +103,38 @@ public struct CalendarView: View {
   private var transition: ((CalendarNavigationDirection) -> AnyTransition)?
   private var usesDrawingGroup = true
 
-  private let fallbackCalendar: Calendar
-
   @Binding private var currentDay: DateComponents
+
+  /// SwiftUI's own calendar environment value. Set it with
+  /// `environment(\.calendar, myCalendar)` to change locale, first weekday, or identifier.
+  @Environment(\.calendar) private var calendar
 
   @State private var navigationDirection: CalendarNavigationDirection?
 
   /// Creates a calendar bound to the day it should show.
   ///
-  /// - Parameters:
-  ///   - currentDay: The day whose month is displayed. Seed it with
-  ///     ``Foundation/Calendar/today`` so the components carry a calendar.
-  ///   - calendar: The calendar used when `currentDay` carries none of its own.
-  ///     Defaults to `Calendar.autoupdatingCurrent`. A calendar attached to
-  ///     `currentDay` always wins, so this is only a fallback.
-  public init(currentDay: Binding<DateComponents>, calendar: Calendar = .autoupdatingCurrent) {
+  /// The calendar itself comes from the environment — see
+  /// `EnvironmentValues.calendar` — so a first weekday, locale, or non-Gregorian
+  /// identifier is set the same way it is for the rest of SwiftUI:
+  ///
+  /// ```swift
+  /// CalendarView(currentDay: $currentDay)
+  ///   .environment(\.calendar, mondayFirst)
+  /// ```
+  ///
+  /// - Parameter currentDay: The day whose month is displayed.
+  public init(currentDay: Binding<DateComponents>) {
     _currentDay = currentDay
-    fallbackCalendar = calendar
   }
 
-  /// The day being displayed, guaranteed to carry a calendar.
+  /// The day being displayed, re-derived in the environment's calendar.
+  ///
+  /// Whatever calendar the bound components carry, the view resolves their instant and
+  /// re-reads it through the environment's calendar, so the grid, the weekday symbols, and
+  /// the month title can never disagree about which calendar they are in.
   private var day: DateComponents {
-    guard currentDay.calendar == nil else { return currentDay }
-
-    let date = fallbackCalendar.date(from: currentDay) ?? .now
-    return fallbackCalendar.calendarDateComponents(from: date)
-  }
-
-  private var calendar: Calendar {
-    day.calendar ?? fallbackCalendar
+    let date = currentDay.date ?? calendar.date(from: currentDay) ?? .now
+    return calendar.calendarDateComponents(from: date)
   }
 
   private var proxy: CalendarProxy {
@@ -153,10 +161,14 @@ public struct CalendarView: View {
             columnSpacing: columnSpacing,
             weekdayStyle: weekdayStyle
           )
+          // Symbols the calendar drew itself are decoration a screen reader can skip.
+          // Labels the caller supplied are theirs to make announceable.
+          .accessibilityHidden(weekdayStyle == nil)
         }
 
         CalendarGrid(
           currentDay: day,
+          cellAspectRatio: cellAspectRatio,
           rowSpacing: rowSpacing,
           columnSpacing: columnSpacing,
           cellStyle: cellStyle
@@ -303,6 +315,19 @@ public struct CalendarView: View {
     return copy
   }
 
+  /// Sets the shape of each day's cell.
+  ///
+  /// `1` — the default — gives the squares a month grid usually wants: cells share the
+  /// width equally and take their height from it. Pass another ratio for wider or taller
+  /// cells, or `nil` to let each cell's content decide its own height.
+  ///
+  /// - Parameter ratio: Width divided by height, or `nil` to size by content.
+  public func calendarCellAspectRatio(_ ratio: CGFloat?) -> Self {
+    var copy = self
+    copy.cellAspectRatio = ratio
+    return copy
+  }
+
   // MARK: - Animating month changes
 
   /// Sets the animation used when the month changes.
@@ -394,12 +419,12 @@ private struct CalendarWeekdays: View {
         }
       }
     }
-    .accessibilityHidden(true)
   }
 }
 
 private struct CalendarGrid: View {
   let currentDay: DateComponents
+  let cellAspectRatio: CGFloat?
   let rowSpacing: CGFloat
   let columnSpacing: CGFloat
   let cellStyle: CalendarView.CellStyle<AnyView>?
@@ -422,21 +447,22 @@ private struct CalendarGrid: View {
         GridRow {
           ForEach(0..<7, id: \.self) { column in
             let index = row * 7 + column
-            Color.clear
-              .aspectRatio(1, contentMode: .fit)
-              .overlay {
-                if index >= firstDayWeekday, index < totalCells {
-                  let day = index - firstDayWeekday + 1
-                  let component = currentDay.with(day: day)
+            CalendarCellContainer(aspectRatio: cellAspectRatio) {
+              if index >= firstDayWeekday, index < totalCells {
+                let day = index - firstDayWeekday + 1
+                let component = currentDay.with(day: day)
 
-                  if let cellStyle {
-                    cellStyle(component)
-                  } else {
-                    Text(verbatim: day.formatted(.number))
-                  }
+                if let cellStyle {
+                  cellStyle(component)
+                } else {
+                  Text(verbatim: day.formatted(.number))
                 }
+              } else {
+                // Not `EmptyView`: a Grid treats that as no cell at all, which would
+                // shift the first week left out of its columns.
+                Color.clear
               }
-              .frame(maxWidth: .infinity)
+            }
           }
         }
       }

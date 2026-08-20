@@ -46,24 +46,40 @@ The only literal strings in the package are the two accessibility labels on the 
 chevrons, which resolve from CalendarKit's own string catalog — see
 <doc:GettingStarted#Accessibility-and-localization>.
 
+### The calendar comes from the environment
+
+Which calendar a view counts in is not a parameter — it is SwiftUI's `\.calendar`
+environment value, set the way you would set it for `DatePicker` or a `Text(date)`:
+
+```swift
+var mondayFirst = Calendar(identifier: .gregorian)
+mondayFirst.firstWeekday = 2
+mondayFirst.locale = Locale(identifier: "fr_FR")
+
+CalendarView(currentDay: $currentDay)
+  .environment(\.calendar, mondayFirst)
+```
+
+That one value decides the first weekday, the weekday symbols, the month title's language,
+and the month lengths. The views re-derive the bound day through it, so the grid, the
+symbols, and the title can never disagree.
+
 ### Days are DateComponents, not Dates
 
 ``CalendarView`` works in `DateComponents` rather than `Date`. A day on a calendar is a
 year-month-day in a particular calendar, not an instant, and components say that
 directly — no time-of-day to normalize, no midnight-in-which-time-zone question.
 
-The one rule that follows: components must carry their calendar. Seed state with
-``Foundation/Calendar/today`` (or ``Foundation/Calendar/calendarDateComponents(from:)``)
-and every helper in this package resolves correctly.
-
 ```swift
-@State private var currentDay = Calendar.autoupdatingCurrent.today
+@State private var currentDay = Calendar.current.today
 ```
 
-Bare components such as `DateComponents(year: 2026, month: 8, day: 17)` carry no
-calendar. ``CalendarView`` falls back to the calendar passed to
-``CalendarView/init(currentDay:calendar:)`` in that case, but the date helpers in
-<doc:WorkingWithDateComponents> return their input unchanged, so prefer seeded values.
+The view accepts whatever you give it — components carrying a calendar or bare ones like
+`DateComponents(year: 2026, month: 8, day: 17)` — because it re-reads them in the
+environment's calendar either way. The `DateComponents` helpers in
+<doc:WorkingWithDateComponents> do still need components that carry a calendar, so seed
+state with ``Foundation/Calendar/today`` or
+``Foundation/Calendar/calendarDateComponents(from:)`` if you use them yourself.
 
 ``InlineCalendarView`` takes `Date` values instead, because the days it shows usually
 come from a range you already computed.

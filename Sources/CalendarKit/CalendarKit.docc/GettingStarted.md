@@ -49,6 +49,25 @@ no title and no chevrons, because the calendar does not decide what your chrome 
 the text it does draw is unstyled, so it inherits your fonts and colors. Moving the binding
 moves the month, so navigation is yours to trigger.
 
+## Choose the calendar
+
+Which calendar the view counts in is not an initializer parameter — it is SwiftUI's
+`\.calendar` environment value, set the same way you would set it for a `DatePicker`:
+
+```swift
+var calendar = Calendar(identifier: .gregorian)
+calendar.firstWeekday = 2                        // start weeks on Monday
+calendar.locale = Locale(identifier: "fr_FR")    // "août 2026", "lun."
+
+CalendarView(currentDay: $currentDay)
+  .environment(\.calendar, calendar)
+```
+
+That single value decides the first weekday, the weekday symbols, the month title's
+language, and the month lengths. Set it once high in your hierarchy and every calendar
+below it follows. The view re-derives the bound day through it, so the grid and the title
+can never disagree about which calendar they are in.
+
 ## Add a toolbar
 
 ``CalendarView/calendarToolbar(_:content:)`` puts your own views above or below the grid,
@@ -185,7 +204,8 @@ weekday symbols over empty squares.
 
 Everything the calendar displays comes from the calendar and its locale: weekday symbols,
 day numbers, and every string on ``CalendarProxy`` are formatted, never hardcoded. Set the
-calendar's `locale` — or rely on `Calendar.autoupdatingCurrent` — and it follows.
+`locale` of the calendar you put in the environment — or rely on the environment's
+default — and it follows.
 
 The package contains exactly two literal strings, the accessibility labels on
 ``CalendarMonthHeader``'s chevrons. They are `LocalizedStringResource` values resolved from
