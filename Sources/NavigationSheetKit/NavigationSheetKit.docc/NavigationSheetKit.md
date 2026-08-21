@@ -49,6 +49,16 @@ Only screens actually popped are removed.
 into a bar the sheet draws itself, which is why the bar can crossfade its contents while the
 screens slide underneath.
 
+### Built on UIKit, skinned in SwiftUI
+
+The sheet's spine is `UISheetPresentationController` and a container view controller; every
+visible surface — screens, bar, chrome — is SwiftUI. That split is deliberate: UIKit owns
+*when* things happen, which is what makes three behaviors possible that a SwiftUI sheet cannot
+express. The sheet is laid out and measured before the presentation animation starts, so it
+opens at the right height instead of opening large and correcting. A push and its resize run
+inside one animation. And an edge swipe from the left pops interactively, the way a
+navigation stack does.
+
 ### iOS only
 
 `PresentationDetent` does not exist on macOS, and detents are most of what this package does.

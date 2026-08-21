@@ -179,6 +179,11 @@ struct SettingsButton: View {
 - **It has a bar, not a navigation bar.** `NavigationSheetToolbarItem` values are declared per
   screen with `.navigationSheetToolbar { }` and collected into one bar the sheet draws itself,
   which is what lets the bar crossfade its contents while the screens slide underneath.
+- **It swipes back.** An edge swipe from the left interactively pops the current screen, the
+  way a navigation stack does — the sheet's spine is UIKit (`UISheetPresentationController`
+  and a container controller), with every visible surface still SwiftUI. That spine is also
+  why a push and its resize run as one animation, and why the sheet opens at the right height
+  instead of opening large and correcting.
 - **`NavigationSheetPath` / `NavigationSheetLink`** — `NavigationPath` and
   `NavigationLink(value:)`, for a sheet. Destinations are registered per value type with
   `.navigationSheetDestination(for:)`; pushing an unregistered type reports a fault rather

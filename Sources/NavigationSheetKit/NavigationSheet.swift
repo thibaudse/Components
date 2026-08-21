@@ -42,24 +42,6 @@ public extension View {
     ))
   }
 
-  /// Presents a navigation sheet that pushes and pops with a transition of your choosing.
-  ///
-  /// The transition replaces the default slide for every screen the path pushes. It is applied
-  /// to the arriving and departing screen, so an asymmetric transition reads as push and pop.
-  func navigationSheet(
-    isPresented: Binding<Bool>,
-    path: Binding<NavigationSheetPath> = .constant(NavigationSheetPath()),
-    transition: some Transition,
-    @ViewBuilder root: @escaping () -> some View
-  ) -> some View {
-    modifier(NavigationSheetModifier(
-      isPresented: isPresented,
-      path: path,
-      transition: transition,
-      root: root
-    ))
-  }
-
   /// Presents a navigation sheet for an optional item.
   ///
   /// Prefer this over the boolean when the sheet's content depends on a value: the item is
@@ -73,21 +55,6 @@ public extension View {
     modifier(NavigationSheetItemModifier(
       item: item,
       path: path,
-      root: root
-    ))
-  }
-
-  /// Presents a navigation sheet for an optional item, with a transition of your choosing.
-  func navigationSheet<Item: Identifiable>(
-    item: Binding<Item?>,
-    path: Binding<NavigationSheetPath> = .constant(NavigationSheetPath()),
-    transition: some Transition,
-    @ViewBuilder root: @escaping (Item) -> some View
-  ) -> some View {
-    modifier(NavigationSheetItemModifier(
-      item: item,
-      path: path,
-      transition: transition,
       root: root
     ))
   }

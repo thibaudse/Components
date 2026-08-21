@@ -83,7 +83,7 @@ gradient or image that belongs to one screen rather than to the sheet.
 
 ### What is not replaceable
 
-The bar's height, the drag indicator's height, the transition blur radius, and the animation
+The bar's height, the drag indicator's height, the push/pop transition, and the animation
 duration are constants. They are not knobs because the bar's height feeds the detent arithmetic:
 a caller changing it would change how tall every screen believes it is, and the failure would
 show up as sheets that are subtly the wrong size rather than as anything obviously broken.

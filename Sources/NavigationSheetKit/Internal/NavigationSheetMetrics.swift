@@ -22,7 +22,5 @@ enum NavigationSheetMetrics {
   /// Bottom padding added on devices with a physical home button, which have no home
   /// indicator to provide it.
   static let homeButtonBottomPadding: CGFloat = 20
-  /// How far a transitioning or backgrounded screen is blurred.
-  static let transitionBlurRadius: CGFloat = 6
 }
 #endif
