@@ -7,7 +7,8 @@ dependencies.
 
 | Component | What it is | Platforms |
 | --- | --- | --- |
-| **CalendarKit** | A SwiftUI month grid, plus a single-row inline calendar. It places the days; you draw them, and the chrome around them. | iOS 17+, macOS 14+ |
+| **CalendarKit** | A SwiftUI month grid, plus a single-row inline calendar. It places the days; you draw them, and the chrome around them. | iOS 18+, macOS 14+ |
+| **NavigationSheetKit** | A sheet that navigates within itself, resizes to whatever screen is showing, and keeps every screen's state while it is out of view. | iOS 18+ |
 
 ## Installation
 
@@ -141,6 +142,99 @@ Xcode and `swift build --build-system swiftbuild` compile string catalogs; Swift
 native build system copies them uncompiled, where lookups fall back to their English
 default values.
 
+## NavigationSheetKit
+
+A `NavigationStack` inside a `.sheet` almost works. What it does not do is resize the sheet
+as you move between screens, and it loses each screen's state the moment you pop it. This is
+the sheet that does both.
+
+```swift
+import NavigationSheetKit
+import SwiftUI
+
+struct SettingsButton: View {
+  @State private var isPresented = false
+  @State private var path = NavigationSheetPath()
+
+  var body: some View {
+    Button("Settings") { isPresented = true }
+      .navigationSheet(isPresented: $isPresented, path: $path) {
+        SettingsRoot()
+          .navigationSheetTitle("Settings")
+          .navigationSheetDestination(for: SettingsRoute.self) { route in
+            SettingsDetail(route: route)
+          }
+      }
+  }
+}
+```
+
+- **It sizes itself.** Each screen is measured — geometry for fixed content, scroll geometry
+  for scrollable content, so a scroll view with a `safeAreaInset` bottom bar comes out right
+  without being told about it — and the sheet takes that height, capped at large.
+  `.navigationSheetDetent(.detent(.large))` when the measurement is not what you want.
+- **It keeps state.** Every screen on the path stays in the hierarchy while it is behind the
+  current one: pushed aside, blurred, and hidden from hit testing and accessibility, but never
+  torn down. Come back to a pushed screen and its scroll position and `@State` are intact.
+- **It has a bar, not a navigation bar.** `NavigationSheetToolbarItem` values are declared per
+  screen with `.navigationSheetToolbar { }` and collected into one bar the sheet draws itself,
+  which is what lets the bar crossfade its contents while the screens slide underneath.
+- **`NavigationSheetPath` / `NavigationSheetLink`** — `NavigationPath` and
+  `NavigationLink(value:)`, for a sheet. Destinations are registered per value type with
+  `.navigationSheetDestination(for:)`; pushing an unregistered type reports a fault rather
+  than showing a blank screen.
+- **`\.navigationSheetDismiss`** — the in-sheet `\.dismiss`. Plain, it pops one screen or
+  dismisses at the root; `dismiss(.all)` always dismisses.
+- **Neutral defaults, all replaceable** — the sheet background, bar background, drag
+  indicator, navigation button, and toolbar button style each have a modifier that replaces
+  them. There is no theme type and no style enum, and nothing else is drawn for you.
+
+### Styling
+
+```swift
+.navigationSheet(isPresented: $isPresented, path: $path) { RootScreen() }
+  .navigationSheetBackground { Color.black.opacity(0.95) }
+  .navigationSheetBarBackground {
+    LinearGradient(colors: [.indigo.opacity(0.6), .clear], startPoint: .top, endPoint: .bottom)
+      .ignoresSafeArea()
+  }
+  .navigationSheetDragIndicator { Capsule().fill(.orange).frame(width: 40, height: 4) }
+```
+
+Out of the box: the system's sheet background; `safeAreaBar`'s own treatment on iOS 26+ and a
+downward-fading `.ultraThinMaterial` below it; a `.tertiary` capsule; a close button at the
+root and a back button once pushed, with localized accessibility labels; and toolbar buttons
+at `.bordered`, becoming `.glass` at the large detent on iOS 26+.
+
+The background you supply is drawn in the sheet's own environment, so it can read
+`\.navigationSheetIsLargeDetent` and change with the sheet's height. Per-screen chrome —
+navigation button, toolbar button style, background overlay — is declared on the screen,
+alongside its toolbar items.
+
+What is *not* replaceable: the bar height, indicator height, blur radius, and animation
+duration. The bar's height feeds the detent arithmetic, so a caller changing it would change
+how tall every screen believes it is. Need a materially different bar? Hide it with
+`.navigationSheetToolbar(.hidden)` and put your own at the top of the screen.
+
+### Localization
+
+The only strings the component displays are the two accessibility labels on the built-in
+navigation button, resolved from `Sources/NavigationSheetKit/Resources/Localizable.xcstrings`
+via `Bundle.module`. Add a language by adding it to that catalog under
+`navigationSheet.button.back` and `navigationSheet.button.close`.
+
+The Swift property names (`navigationBack`, `navigationClose`) deliberately differ from those
+keys: Xcode generates its own accessors from a string catalog, named after the key, and a
+hand-written property matching one compiles under `swift build` and then collides in Xcode.
+
+### iOS only
+
+`PresentationDetent` does not exist on macOS and detents are most of what this component does,
+so the target is wrapped in `#if os(iOS)` and compiles to nothing elsewhere. A multiplatform
+package can depend on it unconditionally; guard the call sites. `NavigationSheetPath` and the
+detent arithmetic are outside the guard, which is how they stay testable under `swift test` on
+macOS.
+
 ## Documentation
 
 Each component carries a DocC catalog with a landing page, guides, and API reference.
@@ -151,7 +245,8 @@ xcodebuild docbuild -scheme Components -destination 'generic/platform=iOS'
 ```
 
 CalendarKit's catalog covers: **Getting started**, **Theming**, and **Working with
-DateComponents**.
+DateComponents**. NavigationSheetKit's covers: **Getting started**, **Toolbars**, **Sizing**,
+and **Styling**.
 
 ## Repository layout
 
@@ -165,8 +260,17 @@ Sources/
     Internal/                        implementation details
     Resources/                       string catalog
     CalendarKit.docc/                landing page and guides
+  NavigationSheetKit/
+    NavigationSheet.swift            the public View modifiers
+    NavigationSheet+Previews.swift   the sizing cases, one destination each
+    Views/                           public views
+    Model/                           path, dismiss, placements, detents
+    Internal/                        container, preferences, measurement, chrome
+    Resources/                       string catalog
+    NavigationSheetKit.docc/         landing page and guides
 Tests/
   CalendarKitTests/
+  NavigationSheetKitTests/
 ```
 
 ## Adding a component

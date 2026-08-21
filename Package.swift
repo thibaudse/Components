@@ -6,13 +6,17 @@ let package = Package(
   name: "Components",
   defaultLocalization: "en",
   platforms: [
-    .iOS(.v17),
+    .iOS(.v18),
     .macOS(.v14)
   ],
   products: [
     .library(
       name: "CalendarKit",
       targets: ["CalendarKit"]
+    ),
+    .library(
+      name: "NavigationSheetKit",
+      targets: ["NavigationSheetKit"]
     )
   ],
   targets: [
@@ -25,6 +29,16 @@ let package = Package(
     .testTarget(
       name: "CalendarKitTests",
       dependencies: ["CalendarKit"]
+    ),
+    .target(
+      name: "NavigationSheetKit",
+      resources: [
+        .process("Resources/Localizable.xcstrings")
+      ]
+    ),
+    .testTarget(
+      name: "NavigationSheetKitTests",
+      dependencies: ["NavigationSheetKit"]
     )
   ]
 )
