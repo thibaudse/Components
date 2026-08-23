@@ -30,7 +30,7 @@ struct NavigationSheetContentMeasurementModifier: ViewModifier {
 
   let pathDepth: Int
 
-  @Environment(\.navigationSheetWindowInsets) private var windowInsets
+  @Environment(\.navigationSheetContainerInsets) private var containerInsets
 
   @State private var snapshot: Snapshot?
 
@@ -67,7 +67,7 @@ struct NavigationSheetContentMeasurementModifier: ViewModifier {
         // The device's own bottom inset is already accounted for by the presentation, so
         // counting a scroll view's version of it again would make every scrollable screen
         // taller than it is.
-        let scrollBottom = max(0, newSnapshot.bottomInset - windowInsets.bottom)
+        let scrollBottom = max(0, newSnapshot.bottomInset - containerInsets.bottom)
         // A high-water mark, because the detent changes the scroll view's insets, which
         // would otherwise change the detent: the two oscillate forever without it.
         let stableBottom = max(scrollBottom, snapshot.bottomInset)

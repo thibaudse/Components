@@ -15,8 +15,11 @@ final class NavigationSheetModel {
   var currentDepth = 0
   /// Whether the sheet is at its full height.
   var isLargeDetent = false
-  /// The hosting window's safe area insets.
-  var windowInsets = EdgeInsets()
+  /// The sheet's own safe area insets, read from the container controller's view.
+  ///
+  /// A known value, not a heuristic: the sheet sits on the screen's bottom edge, so its
+  /// bottom inset is the home-indicator inset — zero exactly on physical-home-button devices.
+  var containerInsets = EdgeInsets()
 
   /// Toolbar items, keyed by the depth that declared them.
   var toolbarItemsByDepth: [Int: [NavigationSheetToolbarResolvedItem]] = [:]

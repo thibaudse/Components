@@ -141,7 +141,7 @@ struct NavigationSheetScreenHost: View {
       .environment(\.navigationSheetPathDepth, depth)
       .environment(\.navigationSheetDismiss, model.dismissAction)
       .environment(\.navigationSheetIsLargeDetent, model.isLargeDetent)
-      .environment(\.navigationSheetWindowInsets, model.windowInsets)
+      .environment(\.navigationSheetContainerInsets, model.containerInsets)
       .environment(\.navigationSheetRegistry, model.registry)
       .environment(\.navigationSheetPath, model.pathBinding)
       // Outermost, so the caller's environment is the base the keys above override —
@@ -150,9 +150,10 @@ struct NavigationSheetScreenHost: View {
   }
 
   /// Bottom margin for devices with a physical home button, which have no home indicator
-  /// to provide one.
+  /// to provide one. The container's own bottom inset is the known answer: zero exactly
+  /// when there is no home indicator.
   private var bottomSafeAreaPadding: CGFloat {
-    model.windowInsets.bottom == 0 ? NavigationSheetMetrics.homeButtonBottomPadding : 0
+    model.containerInsets.bottom == 0 ? NavigationSheetMetrics.homeButtonBottomPadding : 0
   }
 }
 #endif

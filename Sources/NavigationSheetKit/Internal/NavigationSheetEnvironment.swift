@@ -14,11 +14,11 @@ extension EnvironmentValues {
   /// The chrome a caller has replaced, carried from the presenting view into the sheet.
   @Entry var navigationSheetChrome = NavigationSheetChrome()
 
-  /// The hosting window's safe area insets, resolved by the sheet itself.
+  /// The sheet container's safe area insets, published by the container controller.
   ///
-  /// Not the sheet's own insets: a sheet gets whatever the presentation gives it, while the
-  /// layout inside depends on whether the *device* has a home indicator.
-  @Entry var navigationSheetWindowInsets = EdgeInsets()
+  /// The bottom inset is the presentation's known truth: the home-indicator inset, zero on
+  /// devices with a physical home button.
+  @Entry var navigationSheetContainerInsets = EdgeInsets()
 }
 
 public extension EnvironmentValues {

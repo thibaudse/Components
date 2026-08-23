@@ -72,7 +72,7 @@ final class NavigationSheetController: UIViewController {
 
   override func viewWillAppear(_ animated: Bool) {
     super.viewWillAppear(animated)
-    updateWindowInsets()
+    updateContainerInsets()
     // Layout runs before the presentation animation, which means the root screen measures
     // and the detent resolves to the right height before anything is on screen.
     view.layoutIfNeeded()
@@ -81,20 +81,26 @@ final class NavigationSheetController: UIViewController {
 
   override func viewSafeAreaInsetsDidChange() {
     super.viewSafeAreaInsetsDidChange()
-    updateWindowInsets()
+    updateContainerInsets()
   }
 
-  private func updateWindowInsets() {
-    guard let window = viewIfLoaded?.window ?? presentingViewController?.view.window else { return }
-    let insets = window.safeAreaInsets
+  /// Publishes the sheet's own safe area insets — a known value, not a heuristic.
+  ///
+  /// This controller is the presented sheet, and a sheet sits on the screen's bottom edge, so
+  /// `view.safeAreaInsets.bottom` *is* the home-indicator inset for this presentation — zero
+  /// exactly on devices with a physical home button. The SwiftUI implementation had to probe
+  /// the window with a spy view and report a frame late; here UIKit hands us the answer
+  /// synchronously and tells us when it changes.
+  private func updateContainerInsets() {
+    let insets = view.safeAreaInsets
     let edgeInsets = EdgeInsets(
       top: insets.top,
       leading: insets.left,
       bottom: insets.bottom,
       trailing: insets.right
     )
-    if model.windowInsets != edgeInsets {
-      model.windowInsets = edgeInsets
+    if model.containerInsets != edgeInsets {
+      model.containerInsets = edgeInsets
     }
   }
 

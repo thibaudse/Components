@@ -93,16 +93,20 @@ struct NavigationSheetBarContent: View {
 
     @State private var areAnimationsEnabled = false
 
+    /// Regular on iOS 26, where glass buttons carry their own presence; small below, where
+    /// bordered buttons at regular read oversized in an 84pt bar.
+    private var controlSize: ControlSize {
+      if #available(iOS 26.0, *) {
+        .regular
+      } else {
+        .small
+      }
+    }
+
     var body: some View {
       ZStack {
         content()
-          .transform { view in
-            if #available(iOS 26.0, *) {
-              view.controlSize(.regular)
-            } else {
-              view.controlSize(.small)
-            }
-          }
+          .controlSize(controlSize)
           .id(key)
           .transition(.blurReplace)
       }
