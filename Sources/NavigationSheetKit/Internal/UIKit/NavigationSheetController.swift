@@ -34,8 +34,12 @@ final class NavigationSheetController: UIViewController {
   private var resolvedMaximumHeight: CGFloat = 0
   /// The identifier of the sheet's single detent.
   private static let detentIdentifier = UISheetPresentationController.Detent.Identifier("navigationSheetKit.content")
-  /// The in-flight interactive pop, if a gesture is driving one.
-  private var interactivePop: UIViewPropertyAnimator?
+  /// The transition currently animating, if any. Superseding it must go through
+  /// ``beginTransition()`` so its completion cannot fire against reassigned roles.
+  private var transitionAnimator: UIViewPropertyAnimator?
+  /// Cleanup owed by the in-flight transition — removing popped screens, typically. Runs on
+  /// completion, or immediately when the transition is superseded.
+  private var pendingTransitionCleanup: (() -> Void)?
 
   init(
     model: NavigationSheetModel,
@@ -237,13 +241,69 @@ final class NavigationSheetController: UIViewController {
     }
   }
 
+  // MARK: - Transitions
+
+  /// Ends whatever transition is in flight and finalizes its bookkeeping, so a new one can
+  /// start from a clean slate.
+  ///
+  /// This is what makes fast navigation safe. Without it, a superseded animator's completion
+  /// fires late and applies an end-state to views whose roles have changed since — a push's
+  /// "hide the previous screen" landing on the screen a pop just revealed, which leaves the
+  /// sheet visibly empty.
+  private func beginTransition() {
+    if let animator = transitionAnimator {
+      transitionAnimator = nil
+      animator.stopAnimation(true)
+    }
+    pendingTransitionCleanup?()
+    pendingTransitionCleanup = nil
+  }
+
+  /// Runs a transition animation whose completion cannot act stale: it is skipped outright if
+  /// another transition superseded it, and the final state comes from ``settleScreens()``
+  /// rather than from views captured when the animation began.
+  private func runTransition(cleanup: (() -> Void)? = nil, animations: @escaping () -> Void) {
+    pendingTransitionCleanup = cleanup
+
+    let animator = UIViewPropertyAnimator(
+      duration: NavigationSheetMetrics.animationDuration,
+      timingParameters: UISpringTimingParameters(dampingRatio: 1)
+    )
+    animator.addAnimations(animations)
+    animator.addCompletion { [weak self] _ in
+      guard let self, transitionAnimator === animator else { return }
+      transitionAnimator = nil
+      pendingTransitionCleanup?()
+      pendingTransitionCleanup = nil
+      settleScreens()
+    }
+    transitionAnimator = animator
+    animator.startAnimation()
+  }
+
+  /// Puts every screen in its resting state: the top one visible and in place, the rest
+  /// hidden. The single source of truth for what the stack looks like between transitions.
+  private func settleScreens() {
+    guard let top = screens.last else { return }
+    for screen in screens {
+      let isTop = screen === top
+      screen.view.isHidden = !isTop
+      screen.view.transform = .identity
+      screen.view.alpha = isTop ? 1 : screen.view.alpha
+    }
+    top.view.alpha = 1
+  }
+
   private func push(_ content: AnyView, depth: Int, animated: Bool) {
+    beginTransition()
+
     let previous = screens.last
     let screen = makeScreen(depth: depth, content: content)
     installScreen(screen, animated: animated)
     model.currentDepth = depth
 
     guard animated, let previous else {
+      settleScreens()
       applyDetentForTopScreen(animated: animated)
       return
     }
@@ -256,21 +316,12 @@ final class NavigationSheetController: UIViewController {
     screen.view.transform = CGAffineTransform(translationX: width, y: 0)
     screen.view.alpha = 0
 
-    let animator = UIViewPropertyAnimator(
-      duration: NavigationSheetMetrics.animationDuration,
-      timingParameters: UISpringTimingParameters(dampingRatio: 1)
-    )
-    animator.addAnimations {
+    runTransition {
       screen.view.transform = .identity
       screen.view.alpha = 1
       previous.view.transform = CGAffineTransform(translationX: -width, y: 0)
       previous.view.alpha = 0
     }
-    animator.addCompletion { _ in
-      previous.view.isHidden = true
-      previous.view.transform = .identity
-    }
-    animator.startAnimation()
 
     // The detent change rides alongside the slide — the coordinated push-and-resize the
     // SwiftUI port could not express.
@@ -280,6 +331,8 @@ final class NavigationSheetController: UIViewController {
   private func pop(to targetDepth: Int, animated: Bool) {
     guard screens.count - 1 > targetDepth else { return }
 
+    beginTransition()
+
     let removed = Array(screens[(targetDepth + 1)...])
     let revealed = screens[targetDepth]
     screens.removeLast(removed.count)
@@ -288,7 +341,7 @@ final class NavigationSheetController: UIViewController {
     revealed.view.isHidden = false
 
     let width = view.bounds.width
-    let finish: () -> Void = {
+    let removeDeparted: () -> Void = {
       for screen in removed {
         screen.willMove(toParent: nil)
         screen.view.removeFromSuperview()
@@ -297,9 +350,8 @@ final class NavigationSheetController: UIViewController {
     }
 
     guard animated, let departing = removed.last else {
-      revealed.view.transform = .identity
-      revealed.view.alpha = 1
-      finish()
+      removeDeparted()
+      settleScreens()
       applyDetentForTopScreen(animated: animated)
       return
     }
@@ -312,20 +364,12 @@ final class NavigationSheetController: UIViewController {
     revealed.view.transform = CGAffineTransform(translationX: -width, y: 0)
     revealed.view.alpha = 0
 
-    let animator = UIViewPropertyAnimator(
-      duration: NavigationSheetMetrics.animationDuration,
-      timingParameters: UISpringTimingParameters(dampingRatio: 1)
-    )
-    animator.addAnimations {
+    runTransition(cleanup: removeDeparted) {
       departing.view.transform = CGAffineTransform(translationX: width, y: 0)
       departing.view.alpha = 0
       revealed.view.transform = .identity
       revealed.view.alpha = 1
     }
-    animator.addCompletion { _ in
-      finish()
-    }
-    animator.startAnimation()
 
     applyDetentForTopScreen(animated: true)
   }
@@ -395,6 +439,10 @@ final class NavigationSheetController: UIViewController {
 
     switch gesture.state {
       case .began:
+        // Whatever is mid-flight yields to the finger, and its bookkeeping runs now so the
+        // gesture starts from settled screens.
+        beginTransition()
+        settleScreens()
         revealed.view.isHidden = false
         revealed.view.transform = CGAffineTransform(translationX: -width, y: 0)
         revealed.view.alpha = 0
@@ -408,51 +456,36 @@ final class NavigationSheetController: UIViewController {
       case .ended, .cancelled:
         let velocity = gesture.velocity(in: view).x
         let shouldPop = gesture.state == .ended && (progress > 0.4 || velocity > 500)
-        let animator = UIViewPropertyAnimator(
-          duration: NavigationSheetMetrics.animationDuration,
-          timingParameters: UISpringTimingParameters(dampingRatio: 1)
-        )
         if shouldPop {
-          animator.addAnimations {
-            departing.view.transform = CGAffineTransform(translationX: width, y: 0)
-            departing.view.alpha = 0
+          // Commit the pop up front: the screen leaves the stack, the binding hears about
+          // it, and the animation is just the tail. The binding round-trip through setPath
+          // finds the counts already matching and does nothing.
+          let departed = screens.removeLast()
+          model.currentDepth = screens.count - 1
+          runTransition(cleanup: {
+            departed.willMove(toParent: nil)
+            departed.view.removeFromSuperview()
+            departed.removeFromParent()
+          }) {
+            departed.view.transform = CGAffineTransform(translationX: width, y: 0)
+            departed.view.alpha = 0
             revealed.view.transform = .identity
             revealed.view.alpha = 1
           }
-          animator.addCompletion { [weak self] _ in
-            // The gesture already played the animation; the binding round-trip through
-            // setPath must remove the screen without animating it again.
-            self?.finishInteractivePop()
-          }
+          applyDetentForTopScreen(animated: true)
+          onPathPop(screens.count - 1)
         } else {
-          animator.addAnimations {
+          runTransition {
             departing.view.transform = .identity
             departing.view.alpha = 1
             revealed.view.transform = CGAffineTransform(translationX: -width, y: 0)
             revealed.view.alpha = 0
           }
-          animator.addCompletion { _ in
-            revealed.view.isHidden = true
-            revealed.view.transform = .identity
-            revealed.view.alpha = 1
-          }
         }
-        animator.startAnimation()
 
       default:
         break
     }
-  }
-
-  private func finishInteractivePop() {
-    guard screens.count > 1 else { return }
-    let departing = screens.removeLast()
-    departing.willMove(toParent: nil)
-    departing.view.removeFromSuperview()
-    departing.removeFromParent()
-    model.currentDepth = screens.count - 1
-    applyDetentForTopScreen(animated: true)
-    onPathPop(screens.count - 1)
   }
 }
 
