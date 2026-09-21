@@ -33,6 +33,9 @@ final class NavigationSheetScreenController: UIHostingController<NavigationSheet
       preferredDetent = detent
       onSizingChange()
     }
+    rootView.onToolbarHiddenChange = { [weak self] hidden in
+      self?.setToolbarHidden(hidden)
+    }
     view.backgroundColor = .clear
     // The bar floats over the content; this is what makes scroll views start below it and
     // scroll under it, the way content behaves under a navigation bar.
@@ -92,6 +95,7 @@ struct NavigationSheetScreenHost: View {
   /// `super.init`, since they capture `self`.
   var onMeasurement: (NavigationSheetContentMeasurement) -> Void = { _ in }
   var onPreferredDetent: (NavigationSheetPreferredDetent) -> Void = { _ in }
+  var onToolbarHiddenChange: (Bool) -> Void = { _ in }
 
   var body: some View {
     content
@@ -121,11 +125,18 @@ struct NavigationSheetScreenHost: View {
       }
       .onPreferenceChange(NavigationSheetToolbarHiddenKey.self) { depths in
         MainActor.assumeIsolated {
-          if depths.isEmpty {
-            model.toolbarHiddenDepths.remove(depth)
-          } else {
+          let isHidden = !depths.isEmpty
+          if isHidden {
             model.toolbarHiddenDepths.insert(depth)
+          } else {
+            model.toolbarHiddenDepths.remove(depth)
           }
+          // The bar's own content reads `model.isToolbarHidden` and collapses on its own, but
+          // the inset the screen sits under is UIKit's and has to be told. Forwarded from here
+          // rather than read once when the screen is installed: a preference cannot report
+          // before the layout pass that installs the screen, so the install-time read always
+          // sees a screen that has not spoken yet.
+          onToolbarHiddenChange(isHidden)
         }
       }
       .onPreferenceChange(NavigationSheetNavigationButtonKey.self) { items in
