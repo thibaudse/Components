@@ -91,6 +91,28 @@ struct NavigationSheetNavigationButtonKey: PreferenceKey {
   }
 }
 
+// MARK: - Sheet Background
+
+/// A screen's replacement for the sheet's presentation background.
+struct NavigationSheetBackgroundItem: Equatable {
+  let pathDepth: Int
+  let content: AnyView
+
+  // AnyView is not Equatable, so the depth stands in: one screen declares one background,
+  // however it re-renders.
+  static func == (lhs: NavigationSheetBackgroundItem, rhs: NavigationSheetBackgroundItem) -> Bool {
+    lhs.pathDepth == rhs.pathDepth
+  }
+}
+
+struct NavigationSheetBackgroundKey: PreferenceKey {
+  static var defaultValue: [NavigationSheetBackgroundItem] { [] }
+
+  static func reduce(value: inout [NavigationSheetBackgroundItem], nextValue: () -> [NavigationSheetBackgroundItem]) {
+    value.append(contentsOf: nextValue())
+  }
+}
+
 // MARK: - Background Overlay
 
 struct NavigationSheetBackgroundOverlayItem: Equatable {

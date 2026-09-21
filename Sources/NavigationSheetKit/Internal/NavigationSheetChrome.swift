@@ -50,6 +50,30 @@ struct NavigationSheetDefaultBarBackground: View {
   }
 }
 
+// MARK: - Background
+
+/// Publishes a replaced sheet background on both channels, because either end of the
+/// presentation may declare it.
+///
+/// The environment reaches the **presenter**, which snapshots the chrome from its own
+/// position in the tree — the only thing a presenting view can set. A preference travels
+/// **outward** to the screen's host, which is the only direction that reaches the container
+/// from inside the sheet. Whichever end declared it, exactly one of the two is ever read.
+private struct NavigationSheetBackgroundModifier: ViewModifier {
+  @Environment(\.navigationSheetPathDepth) private var pathDepth
+
+  let background: AnyView
+
+  func body(content: Content) -> some View {
+    content
+      .transformEnvironment(\.navigationSheetChrome) { $0.background = background }
+      .preference(
+        key: NavigationSheetBackgroundKey.self,
+        value: [NavigationSheetBackgroundItem(pathDepth: pathDepth, content: background)]
+      )
+  }
+}
+
 // MARK: - Public API
 
 public extension View {
@@ -59,6 +83,11 @@ public extension View {
   /// own — read `\.navigationSheetIsLargeDetent` inside it to distinguish a full-height
   /// sheet from a short one, and the change will crossfade as the detent moves.
   ///
+  /// This is the one chrome piece that works from **either side**: set it on the presenting
+  /// view for every screen the sheet shows, or inside a screen for that screen alone, where
+  /// it wins over the presenting view's. A screen that paints its own panel is making the
+  /// more specific statement, and it is the screen — not its host — that knows it.
+  ///
   /// ```swift
   /// .navigationSheetBackground {
   ///   Color.black.opacity(0.95)
@@ -67,8 +96,16 @@ public extension View {
   func navigationSheetBackground<Background: View>(
     @ViewBuilder _ content: () -> Background
   ) -> some View {
-    let background = AnyView(content())
-    return transformEnvironment(\.navigationSheetChrome) { $0.background = background }
+    modifier(NavigationSheetBackgroundModifier(background: AnyView(content())))
+  }
+
+  /// Replaces the sheet's presentation background with a style.
+  ///
+  /// `.navigationSheetBackground(.thinMaterial)` rather than a `Rectangle` filled with one.
+  /// Styles that resolve against the environment — a design system's semantic color, say —
+  /// resolve against the caller's, since the sheet re-injects it.
+  func navigationSheetBackground(_ style: some ShapeStyle) -> some View {
+    navigationSheetBackground { Rectangle().fill(style) }
   }
 
   /// Replaces the background behind the sheet's top bar.

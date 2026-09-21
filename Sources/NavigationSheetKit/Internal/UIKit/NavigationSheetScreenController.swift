@@ -144,6 +144,11 @@ struct NavigationSheetScreenHost: View {
           model.navigationButtonsByDepth[depth] = items.first?.override
         }
       }
+      .onPreferenceChange(NavigationSheetBackgroundKey.self) { items in
+        MainActor.assumeIsolated {
+          model.screenBackgroundsByDepth[depth] = items.first?.content
+        }
+      }
       .onPreferenceChange(NavigationSheetBackgroundOverlayKey.self) { items in
         MainActor.assumeIsolated {
           model.backgroundOverlaysByDepth[depth] = items.first?.content

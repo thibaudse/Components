@@ -29,6 +29,8 @@ final class NavigationSheetModel {
   var navigationButtonsByDepth: [Int: NavigationSheetNavigationButtonOverride] = [:]
   /// Background overlays, keyed by depth.
   var backgroundOverlaysByDepth: [Int: AnyView] = [:]
+  /// Presentation backgrounds a screen declared for itself, keyed by depth.
+  var screenBackgroundsByDepth: [Int: AnyView] = [:]
 
   /// Appearance the caller replaced, captured at the presenting view.
   var chrome = NavigationSheetChrome()
@@ -47,6 +49,19 @@ final class NavigationSheetModel {
   /// Whether the bar is hidden for the screen currently showing.
   var isToolbarHidden: Bool {
     toolbarHiddenDepths.contains(currentDepth)
+  }
+
+  /// The presentation background to draw. The screen showing wins over the one the presenting
+  /// view set: a screen that paints its own panel is making the more specific statement.
+  /// `nil` means nothing replaced it, and the sheet draws the system's own surface.
+  var resolvedBackground: AnyView? {
+    screenBackgroundsByDepth[currentDepth] ?? chrome.background
+  }
+
+  /// Whether anything replaced the sheet's background — what the surface underneath
+  /// crossfades on, since a screen's answer arrives a layout pass after it is presented.
+  var hasReplacedBackground: Bool {
+    resolvedBackground != nil
   }
 
   /// The dismiss action handed to every screen through the environment.

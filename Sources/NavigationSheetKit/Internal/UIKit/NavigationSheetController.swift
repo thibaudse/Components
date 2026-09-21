@@ -408,10 +408,11 @@ final class NavigationSheetController: UIViewController {
   // MARK: - Background
 
   private func installBackground() {
-    // The host always installs: a screen's background overlay arrives through preferences
-    // after layout, well past this point. The base color is what "no replaced background"
-    // means — the system's sheet surface.
-    view.backgroundColor = model.chrome.background == nil ? .systemBackground : .clear
+    // Always clear, and the surface underneath is drawn in SwiftUI instead: whether the
+    // background was replaced is no longer knowable here, since a screen declares its own
+    // through a preference that cannot arrive until a layout pass after this one. Deciding it
+    // here would leave an opaque system surface under a translucent panel.
+    view.backgroundColor = .clear
     let host = UIHostingController<AnyView>(rootView: AnyView(NavigationSheetBackgroundContent(model: model)))
     host.view.backgroundColor = .clear
     addChild(host)
@@ -501,8 +502,14 @@ private struct NavigationSheetBackgroundContent: View {
 
   var body: some View {
     ZStack {
-      if let background = model.chrome.background {
+      if let background = model.resolvedBackground {
         background
+      } else {
+        // "Nothing replaced it" means the system's sheet surface. Drawn here rather than as
+        // the container's colour, because a screen's own background arrives a layout pass
+        // after the sheet is presented — so this branch has to be able to give way.
+        Color(.systemBackground)
+          .transition(.opacity)
       }
 
       if let overlay = model.backgroundOverlaysByDepth[model.currentDepth] {
@@ -512,6 +519,7 @@ private struct NavigationSheetBackgroundContent: View {
       }
     }
     .animation(.smooth, value: model.isLargeDetent)
+    .animation(.smooth(duration: NavigationSheetMetrics.animationDuration), value: model.hasReplacedBackground)
     .ignoresSafeArea()
     .environment(\.navigationSheetIsLargeDetent, model.isLargeDetent)
     .environment(\.self, model.environment)

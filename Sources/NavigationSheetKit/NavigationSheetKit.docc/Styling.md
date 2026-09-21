@@ -43,6 +43,31 @@ presentation rather than to one screen:
 
 Pass `EmptyView()` to a slot to remove what is there.
 
+The background also takes a style, for when a `Rectangle` filled with one is all it was going
+to be:
+
+```swift
+.navigationSheetBackground(.thinMaterial)
+```
+
+**The background is the one piece either end may declare.** Set it inside a screen and it
+applies to that screen alone, winning over the presenting view's — a screen that paints its own
+panel is making the more specific statement, and it is the screen that knows it:
+
+```swift
+.navigationSheet(isPresented: $isPresented) {
+  SessionPreview()
+    .navigationSheetToolbar(.hidden)
+    .navigationSheetBackground(.thinMaterial)
+}
+```
+
+It reaches the sheet from either side because the modifier publishes on both channels: the
+environment, which the presenter snapshots from its own position in the tree, and a preference,
+which travels outward to the screen's host — the only direction that reaches the container from
+inside the sheet. The bar background and the drag indicator stay presenting-view only; they are
+part of one bar shared by every screen, and nothing has needed to vary them per screen.
+
 The background you supply is drawn inside the sheet's own environment, so it can read
 `\.navigationSheetIsLargeDetent` and change with the sheet's height:
 
