@@ -9,6 +9,7 @@ dependencies.
 | --- | --- | --- |
 | **CalendarKit** | A SwiftUI month grid, plus a single-row inline calendar. It places the days; you draw them, and the chrome around them. | iOS 18+, macOS 14+ |
 | **NavigationSheetKit** | A sheet that navigates within itself, resizes to whatever screen is showing, and keeps every screen's state while it is out of view. | iOS 18+ |
+| **AdaptiveSheetKit** | `sheet` with the detent taken care of: a sheet as tall as its content, that resizes with it — through scroll views, the keyboard, and pushes in a `NavigationStack`. | iOS 18+ |
 
 ## Installation
 
@@ -240,6 +241,46 @@ package can depend on it unconditionally; guard the call sites. `NavigationSheet
 detent arithmetic are outside the guard, which is how they stay testable under `swift test` on
 macOS.
 
+## AdaptiveSheetKit
+
+For a sheet that should hug its content rather than navigate. `adaptiveSheet` takes `sheet`'s
+exact signatures, so a call site changes by one word:
+
+```swift
+import AdaptiveSheetKit
+import SwiftUI
+
+struct TipButton: View {
+  @State private var isShowingTip = false
+
+  var body: some View {
+    Button("Show tip") { isShowingTip = true }
+      .adaptiveSheet(isPresented: $isShowingTip) {
+        TipView(onGotIt: { isShowingTip = false })
+          .presentationDragIndicator(.visible)
+          .presentationBackground(.thinMaterial)
+      }
+  }
+}
+```
+
+There is an `adaptiveSheet(item:onDismiss:content:)` variant too, with `sheet(item:)`'s
+contract.
+
+The presentation is still SwiftUI's: the grabber, background, corner radius and dismissal
+are the `.presentation*` modifiers and `interactiveDismissDisabled()`, inside the content, as
+on any sheet. Only the detent is the modifier's — do not add `presentationDetents(_:)`.
+
+Static content is measured as laid out; a `ScrollView` by its content size, so it hugs what
+it scrolls rather than the frame the sheet gave it; and inside a `NavigationStack`, the sheet
+resizes to each screen once a push or pop has finished. Content taller than the screen stops
+at the large detent and scrolls the rest.
+
+It sizes the sheet's own `UISheetPresentationController` with one custom detent whose value
+changes, rather than swapping `.height` detents, which SwiftUI would jump between instead of
+animating. Like NavigationSheetKit, the target compiles to nothing outside iOS; the detent
+arithmetic stays outside the guard so `swift test` covers it on macOS.
+
 ## Documentation
 
 Each component carries a DocC catalog with a landing page, guides, and API reference.
@@ -251,7 +292,7 @@ xcodebuild docbuild -scheme Components -destination 'generic/platform=iOS'
 
 CalendarKit's catalog covers: **Getting started**, **Theming**, and **Working with
 DateComponents**. NavigationSheetKit's covers: **Getting started**, **Toolbars**, **Sizing**,
-and **Styling**.
+and **Styling**. AdaptiveSheetKit's covers: **Getting started**.
 
 ## Repository layout
 
@@ -273,9 +314,15 @@ Sources/
     Internal/                        container, preferences, measurement, chrome
     Resources/                       string catalog
     NavigationSheetKit.docc/         landing page and guides
+  AdaptiveSheetKit/
+    View+AdaptiveSheet.swift         the public View modifiers
+    View+AdaptiveSheet+Previews.swift  the sizing cases, one preview each
+    Internal/                        measurement, reading order, UIKit detent controller
+    AdaptiveSheetKit.docc/           landing page and guide
 Tests/
   CalendarKitTests/
   NavigationSheetKitTests/
+  AdaptiveSheetKitTests/
 ```
 
 ## Adding a component

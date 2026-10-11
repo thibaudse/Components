@@ -11,6 +11,10 @@ let package = Package(
   ],
   products: [
     .library(
+      name: "AdaptiveSheetKit",
+      targets: ["AdaptiveSheetKit"]
+    ),
+    .library(
       name: "CalendarKit",
       targets: ["CalendarKit"]
     ),
@@ -20,6 +24,13 @@ let package = Package(
     )
   ],
   targets: [
+    .target(
+      name: "AdaptiveSheetKit"
+    ),
+    .testTarget(
+      name: "AdaptiveSheetKitTests",
+      dependencies: ["AdaptiveSheetKit"]
+    ),
     .target(
       name: "CalendarKit",
       resources: [
