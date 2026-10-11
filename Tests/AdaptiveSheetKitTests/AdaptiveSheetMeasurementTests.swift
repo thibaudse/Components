@@ -24,7 +24,24 @@ struct AdaptiveSheetMeasurementTests {
   func capsAtTheTallestTheSheetCanBe(maximum: CGFloat, expected: CGFloat) {
     let measurement = AdaptiveSheetMeasurement(topInset: 24, contentHeight: 300, bottomInset: 16)
 
-    #expect(measurement.detentHeight(cappedAt: maximum) == expected)
+    #expect(measurement.detentHeight(cappedAt: maximum, displayScale: 3) == expected)
+  }
+
+  // Rounded down, a scroll view that fits was left a fraction of a point taller than its frame, and
+  // scrolled.
+  @Test(arguments: [
+    (content: 300.1, scale: 3, expected: 901.0 / 3),
+    (content: 300.1, scale: 2, expected: 300.5),
+    (content: 300.1, scale: 0, expected: 301),
+    (content: 300.0, scale: 3, expected: 300),
+  ] as [(content: CGFloat, scale: CGFloat, expected: CGFloat)])
+  func roundsUpToThePixelGrid(content: CGFloat, scale: CGFloat, expected: CGFloat) {
+    let measurement = AdaptiveSheetMeasurement(topInset: 0, contentHeight: content, bottomInset: 0)
+
+    let height = measurement.detentHeight(cappedAt: 800, displayScale: scale)
+
+    #expect(height >= content)
+    #expect(height == expected)
   }
 
   // Counted in the scroll view's insets as well as the presentation's, the home indicator's inset

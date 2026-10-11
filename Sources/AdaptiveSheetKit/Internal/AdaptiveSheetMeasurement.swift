@@ -57,10 +57,19 @@ struct AdaptiveSheetMeasurement: Equatable {
     )
   }
 
-  /// The detent height, capped at the tallest the sheet can be.
+  /// The detent height, rounded up to the pixel grid and capped at the tallest the sheet can be.
   ///
-  /// Content taller than the screen stops at the large detent; scrolling past it is the caller's.
-  func detentHeight(cappedAt maximumHeight: CGFloat) -> CGFloat {
-    min(detentHeight, max(0, maximumHeight))
+  /// **Rounded up, never to the nearest.** A measurement is fractional — 300.1 of content — and the
+  /// sheet lands on whole pixels. Rounded down by even part of a pixel, a scroll view that fits is
+  /// left a sliver taller than its frame and scrolls. Content taller than the screen stops at the
+  /// large detent; scrolling past it is the caller's.
+  ///
+  /// - Parameters:
+  ///   - maximumHeight: The tallest the sheet can be.
+  ///   - displayScale: Pixels per point. Zero or less rounds up to whole points.
+  func detentHeight(cappedAt maximumHeight: CGFloat, displayScale: CGFloat) -> CGFloat {
+    let scale = displayScale > 0 ? displayScale : 1
+    let rounded = (detentHeight * scale).rounded(.up) / scale
+    return min(rounded, max(0, maximumHeight))
   }
 }

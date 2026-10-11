@@ -384,7 +384,10 @@ final class AdaptiveSheetDetentController: UIViewController {
       // A custom detent's height leaves out the bottom safe area, which is why the measurement
       // has already taken the home indicator's inset out.
       guard let self, let measurement = self.measurement else { return context.maximumDetentValue }
-      let height = measurement.detentHeight(cappedAt: context.maximumDetentValue)
+      let height = measurement.detentHeight(
+        cappedAt: context.maximumDetentValue,
+        displayScale: context.containerTraitCollection.displayScale
+      )
       // A layout reading that fills the sheet is, until the placeholder is released, a stack not
       // built yet rather than content asking for the whole screen.
       let isFillingLayout = self.holdsPlaceholder && self.isLayoutReading && height >= context.maximumDetentValue
