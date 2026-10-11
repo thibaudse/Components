@@ -17,10 +17,6 @@ let package = Package(
     .library(
       name: "CalendarKit",
       targets: ["CalendarKit"]
-    ),
-    .library(
-      name: "NavigationSheetKit",
-      targets: ["NavigationSheetKit"]
     )
   ],
   targets: [
@@ -40,16 +36,6 @@ let package = Package(
     .testTarget(
       name: "CalendarKitTests",
       dependencies: ["CalendarKit"]
-    ),
-    .target(
-      name: "NavigationSheetKit",
-      resources: [
-        .process("Resources/Localizable.xcstrings")
-      ]
-    ),
-    .testTarget(
-      name: "NavigationSheetKitTests",
-      dependencies: ["NavigationSheetKit"]
     )
   ]
 )
