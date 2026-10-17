@@ -82,8 +82,7 @@ public struct CalendarView: View {
   /// A closure building one toolbar row from the calendar's state and actions.
   public typealias ToolbarContent<Content: View> = (_ month: CalendarProxy) -> Content
 
-  private struct Toolbar: Identifiable {
-    let id = UUID()
+  private struct Toolbar {
     let placement: CalendarToolbarPlacement
     let content: ToolbarContent<AnyView>
   }
@@ -194,9 +193,12 @@ public struct CalendarView: View {
     if !rows.isEmpty {
       let proxy = proxy
 
+      // Identified by position, never by a value minted in `calendarToolbar`: the modifiers run
+      // again on every update of the view holding the calendar, so a fresh id would rebuild
+      // each row from scratch — dropping its state and any animation running inside it.
       VStack(spacing: toolbarSpacing) {
-        ForEach(rows) { row in
-          row.content(proxy)
+        ForEach(rows.indices, id: \.self) { index in
+          rows[index].content(proxy)
         }
       }
     }
