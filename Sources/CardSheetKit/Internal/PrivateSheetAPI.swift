@@ -79,11 +79,36 @@ extension UISheetPresentationController {
   var sheetChromeView: UIView? { privateObject("dropShadowView") as? UIView }
 }
 
-extension UIScreen {
-  /// `_displayCornerRadius`: the radius of the physical display's corners, so a card that grows
-  /// to full screen ends with exactly the screen's own curve.
-  var displayCornerRadius: CGFloat {
-    (value(forKey: "_displayCornerRadius") as? CGFloat) ?? 0
+extension UINavigationController {
+  /// `_verticalBarEligibleEdges` → none, through a runtime subclass of this one controller's
+  /// class. An iPhone Duo runs its status bar down the side, and a navigation controller whose
+  /// view reaches that edge of the display is drawn as that display's full-screen one: its bar
+  /// one 28 pt title with no large title, its content's top 52 pt higher, the window's side inset
+  /// let in past any its parent gives. A card reaches that edge whenever it is off to the right,
+  /// slides past it, or is full screen — and its title jumped as it switched. Eligible for no
+  /// such edge, a card's bar is a sheet's everywhere; the engine keeps it clear of the status
+  /// bar with the side safe area it gives the controller.
+  func ignoreSideStatusBar() {
+    let selector = NSSelectorFromString("_verticalBarEligibleEdges")
+    guard let original = object_getClass(self) else { return }
+    let prefix = "CardSheetKitNoSideStatusBar_"
+    if NSStringFromClass(original).hasPrefix(prefix) { return }
+    guard let method = class_getInstanceMethod(original, selector) else {
+      PrivateSheetAPI.log.error("_verticalBarEligibleEdges is not available on this iOS")
+      return
+    }
+    let name = prefix + NSStringFromClass(original)
+    let subclass: AnyClass
+    if let existing = NSClassFromString(name) {
+      subclass = existing
+    } else {
+      guard let created = objc_allocateClassPair(original, name, 0) else { return }
+      let none: @convention(block) (AnyObject) -> UInt = { _ in 0 }
+      class_addMethod(created, selector, imp_implementationWithBlock(none), method_getTypeEncoding(method))
+      objc_registerClassPair(created)
+      subclass = created
+    }
+    object_setClass(self, subclass)
   }
 }
 #endif

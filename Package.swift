@@ -43,11 +43,14 @@ let package = Package(
     ),
     .target(
       name: "CardSheetKit",
-      dependencies: ["CardSheetKitObjC"]
+      dependencies: ["CardSheetKitObjC"],
+      exclude: ["ObjC"]
     ),
-    // Swift cannot catch an Objective-C exception, and private UIKit can raise one.
+    // Swift cannot catch an Objective-C exception, and private UIKit can raise one. SwiftPM
+    // cannot mix languages in one target, so this lives inside CardSheetKit's folder as its own.
     .target(
-      name: "CardSheetKitObjC"
+      name: "CardSheetKitObjC",
+      path: "Sources/CardSheetKit/ObjC"
     ),
     .testTarget(
       name: "CardSheetKitTests",

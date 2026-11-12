@@ -235,9 +235,8 @@ modifiers have no system-sheet equivalent: `presentationSnapping(_:)`,
 
 The card is drawn by SwiftUI and moved by an engine that takes over the
 `UISheetPresentationController` SwiftUI configures. That takes private UIKit: a full-screen sheet,
-its chrome and dimming, the display's corner radius, and the private methods UIKit's detent
-resolvers call. Every selector is checked before use, and a missing one is logged and skipped
-rather than crashing, but **none of it would pass App Review**. The DocC article *How it works*
+its chrome and dimming, and the private methods UIKit's detent resolvers call. Every selector is
+checked before use, and a missing one is logged and skipped rather than crashing, but **none of it would pass App Review**. The DocC article *How it works*
 lists each call and what it is for.
 
 ### Lab app and UI tests
@@ -253,7 +252,8 @@ xcodebuild test -scheme CardSheetLab -parallel-testing-enabled NO \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
-The suite passes on iOS 26.5, 27.0 and 27.2.
+The suite passes on iOS 26.5, 27.0 and 27.2, and on an iPhone Duo (iOS 27.2), where the four
+tests that need room between `.large` and full screen skip: the Duo leaves 8 pt.
 
 ## Documentation
 
@@ -290,7 +290,7 @@ Sources/
     View+CardSheet+Previews.swift    the presenters, one preview each
     Internal/                        the engine, the sheet takeover, private API
     CardSheetKit.docc/               landing page and guides
-  CardSheetKitObjC/                  catches Objective-C exceptions for CardSheetKit
+    ObjC/                            catches Objective-C exceptions (a target of its own)
 Tests/
   CalendarKitTests/
   AdaptiveSheetKitTests/

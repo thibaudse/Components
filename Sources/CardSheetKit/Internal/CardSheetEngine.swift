@@ -27,7 +27,6 @@ final class CardSheetEngine {
 
   private(set) var size: CGSize = .zero
   private(set) var safeArea: UIEdgeInsets = .zero
-  private(set) var displayCornerRadius: CGFloat = 0
   /// The top of the cards (the current one also moves down by `dismissOffset`).
   private(set) var cardTop: CGFloat = 0
   private(set) var dismissOffset: CGFloat = 0
@@ -47,11 +46,14 @@ final class CardSheetEngine {
 
   // MARK: Derived geometry
 
+  /// Where `.large` puts the card's top: under the status bar, or 8 pt down a display with
+  /// none across its top.
+  var largeTop: CGFloat { DetentContext.largeTop(safeArea: safeArea) }
   /// The card's lowest resting place — its smallest detent.
-  var restTop: CGFloat { configuration.detentTops.max() ?? safeArea.top }
+  var restTop: CGFloat { configuration.detentTops.max() ?? largeTop }
   /// The highest the card goes: the top of the display, or its largest detent.
   var fullTop: CGFloat {
-    expandsToFullScreen ? 0 : (configuration.detentTops.min() ?? safeArea.top)
+    expandsToFullScreen ? 0 : (configuration.detentTops.min() ?? largeTop)
   }
 
   /// Only a card that can reach `.large` goes on to full screen — a `.large` detent, or a custom
@@ -60,7 +62,7 @@ final class CardSheetEngine {
   private var expandsToFullScreen: Bool {
     guard options.expandsToFullScreen ?? true else { return false }
     guard let highest = configuration.detentTops.min() else { return true }
-    return highest <= safeArea.top + 0.5
+    return highest <= largeTop + 0.5
   }
   /// How far the card rises from its resting detent to its top — none with a single detent
   /// that does not go full screen. (Once kept at 1 pt or more to divide by: a scroll then lifted
@@ -87,7 +89,7 @@ final class CardSheetEngine {
   /// never goes full screen keeps it all.
   private var peekProgress: CGFloat {
     guard expandsToFullScreen else { return 0 }
-    let start = min(restTop, safeArea.top)
+    let start = min(restTop, largeTop)
     let range = start - fullTop
     guard range > 0 else { return 0 }
     return min(max((start - cardTop) / range, 0), 1)
@@ -104,7 +106,6 @@ final class CardSheetEngine {
   /// 1 at or below the nearest detent smaller than `.large`, 0 at `.large` and above, and
   /// continuous between them, as the system sheet morphs while it is dragged.
   var floating: CGFloat {
-    let largeTop = safeArea.top
     guard let nearest = configuration.detentTops.filter({ $0 > largeTop + 1 }).min() else { return 0 }
     return min(max((cardTop - largeTop) / (nearest - largeTop), 0), 1)
   }
@@ -118,10 +119,10 @@ final class CardSheetEngine {
   }
 
   /// How much of a card shows. Floating, it ends `floatingInset` above the bottom of the
-  /// display; attached, it runs past the bottom by its corner radius, so its bottom corners are
-  /// never seen.
+  /// display; attached, it runs past the bottom by its resting corner radius — the least its
+  /// bottom corners are rounded — so they are never seen.
   var visibleHeight: CGFloat {
-    max(size.height - cardTop - floatingInset * floating + (1 - floating) * bottomCornerRadius, 0)
+    max(size.height - cardTop - floatingInset * floating + (1 - floating) * restingCornerRadius, 0)
   }
 
   /// The height the content is laid out in — the space the card offers, as a sheet resizes its
@@ -139,20 +140,37 @@ final class CardSheetEngine {
   /// The current card's lowest visible point, for tests.
   var visibleBottom: CGFloat { cardTop + dismissOffset + visibleHeight }
 
-  var cornerRadius: CGFloat {
-    let resting = configuration.cornerRadius ?? 38
-    return resting + (displayCornerRadius - resting) * expansion
-  }
+  /// The card's corners are concentric with the display's (`ConcentricRectangle`), never less
+  /// rounded than this where they are too far from the display's to follow them:
+  /// `presentationCornerRadius`, or UIKit's 38 pt.
+  var restingCornerRadius: CGFloat { configuration.cornerRadius ?? 38 }
 
-  /// Concentric with the display's corners, at the floating inset.
-  var bottomCornerRadius: CGFloat { max(displayCornerRadius - floatingInset, 0) }
+  /// The top corners' least rounding: none where the card is close enough to the display's
+  /// corners to be concentric with them, so they are the display's own curve, inset — even where
+  /// that is barely rounded (an iPhone Duo's left corners are 8 pt, its right ones 59) — and the
+  /// resting radius once the card is 24 pt further down. Under a status bar that closeness is
+  /// only full screen; a display with none across its top floats `.large` 8 pt from it, and UIKit
+  /// draws that sheet concentric already (Apple Maps on an iPhone Duo: a near-square top-left
+  /// corner, a round top-right one). Given up only that late, the minimum never pulls a corner
+  /// below the curve it is growing into.
+  var topCornerMinimum: CGFloat {
+    let concentricFrom = largeTop > safeArea.top ? largeTop : 0
+    let below = cardTop + dismissOffset - concentricFrom
+    return restingCornerRadius * min(max(below / 24, 0), 1)
+  }
 
   /// `presentationDragIndicator` decides, at every height but full screen — where it would sit
   /// under the Dynamic Island. It fades over the last points to the top rather than popping.
   var grabberOpacity: CGFloat {
     guard configuration.showsGrabber else { return 0 }
     guard expandsToFullScreen else { return 1 }
-    return min(max((cardTop + dismissOffset) / 24, 0), 1)
+    return nearTop
+  }
+
+  /// 1 until the last points below the top, then down to 0 at it: 24 pt, or all the room above
+  /// `.large` where there is less (8 pt on an iPhone Duo), so it is 1 at `.large`.
+  private var nearTop: CGFloat {
+    min(max((cardTop + dismissOffset) / min(24, largeTop), 0), 1)
   }
 
   func opacity(for index: Int) -> CGFloat {
@@ -202,7 +220,6 @@ final class CardSheetEngine {
     self.sheet = sheet
     size = window.bounds.size
     safeArea = window.safeAreaInsets
-    displayCornerRadius = window.screen.displayCornerRadius
     host.view.backgroundColor = .clear
     // No safe area inside the sheet: a moving card overlaps the status bar by a different
     // amount every frame, and SwiftUI turned each into a new top inset for the content's
@@ -293,8 +310,10 @@ final class CardSheetEngine {
   }
 
   /// Every navigation controller in the cards — not only the touched one — gets margins of its
-  /// own (see `fixMargins(of:)`). Each is fixed once; a pass that finds nothing new costs a walk
-  /// down to the first navigation bar of each card.
+  /// own (see `fixMargins(of:)`), and the side safe area of a status bar down the side of the
+  /// display, so a card sliding in is laid out as it will be once current. Margins are fixed
+  /// once; a pass that finds nothing new costs a walk down to the first navigation bar of each
+  /// card.
   func fixNavigationMargins() {
     guard let root = host?.view else { return }
     var stack: [UIView] = [root]
@@ -302,8 +321,10 @@ final class CardSheetEngine {
       if let bar = view as? UINavigationBar, let controller = Self.navigationController(of: bar) {
         if !fixedNavigations.contains(controller) {
           Self.fixMargins(of: controller, standard: standardMargin)
+          if safeArea.left > 0 || safeArea.right > 0 { controller.ignoreSideStatusBar() }
           fixedNavigations.add(controller)
         }
+        holdSideSafeArea(of: controller)
         continue
       }
       stack.append(contentsOf: view.subviews)
@@ -379,7 +400,7 @@ final class CardSheetEngine {
 
   private func navigationSafeArea(at top: CGFloat) -> CGFloat {
     let padding = navigationPadding > 0 ? navigationPadding : 10
-    return max(safeArea.top + padding - top, padding)
+    return max(largeTop + padding - top, padding)
   }
 
   /// Below 0 pulled towards dismissal, 0 at rest, `travel` at the top with the content at its
@@ -523,12 +544,42 @@ final class CardSheetEngine {
     // scroll view. A drag there must scroll it back to its top before the card moves, as a drag
     // on the content does; found without it, the card moved alone and the scrolled content
     // snapped to its top — a jump of the whole content.
-    content = found ?? cardScrollView(near: view, at: point)
-    noteNavigationController()
+    adoptContent(found ?? cardScrollView(near: view, at: point))
 
     // The content's insets are its own — a navigation bar's, the status bar's at full screen.
     content?.isScrollEnabled = contentScrollsHere
     return true
+  }
+
+  /// The content the engine drives from now on — the touched card's, or the current card's once
+  /// a page change settles — and how far it is scrolled, which is its own. Carried over from the
+  /// card before, the next pass put this one where that one had been left: at `.medium`, a card
+  /// scrolled in place, then the next card touched, scrolled the next card by as much.
+  private func adoptContent(_ scrollView: UIScrollView?) {
+    let previous = content
+    content = scrollView
+    noteNavigationController()
+    guard let scrollView, scrollView !== previous else { return }
+    previous?.isScrollEnabled = contentScrollsHere
+    contentScrolled = max(scrollView.contentOffset.y - contentTop(scrollView), 0)
+  }
+
+  /// The vertical scroll view of the card at `index`, found where that card is laid out.
+  private func scrollView(ofCard index: Int) -> UIScrollView? {
+    guard let root = host?.view else { return nil }
+    let midX = frame(for: index).midX
+    var stack: [UIView] = [root]
+    var visited = 0
+    while let candidate = stack.popLast(), visited < 2000 {
+      visited += 1
+      if let scrollView = candidate as? UIScrollView, Self.scrollsVertically(scrollView) {
+        let frame = scrollView.convert(scrollView.bounds, to: root)
+        if frame.minX <= midX, midX <= frame.maxX { return scrollView }
+        continue
+      }
+      stack.append(contentsOf: candidate.subviews)
+    }
+    return nil
   }
 
   /// The content's navigation controller, if it is in one — measuring, the first time, the top
@@ -597,6 +648,28 @@ final class CardSheetEngine {
     if abs(navigation.additionalSafeAreaInsets.top - top) > 0.01 {
       navigation.additionalSafeAreaInsets.top = top
     }
+    holdSideSafeArea(of: navigation)
+  }
+
+  private func holdSideSafeArea(of controller: UINavigationController) {
+    let left = navigationSideSafeArea(safeArea.left)
+    if abs(controller.additionalSafeAreaInsets.left - left) > 0.01 {
+      controller.additionalSafeAreaInsets.left = left
+    }
+    let right = navigationSideSafeArea(safeArea.right)
+    if abs(controller.additionalSafeAreaInsets.right - right) > 0.01 {
+      controller.additionalSafeAreaInsets.right = right
+    }
+  }
+
+  /// The side safe area the content's navigation controller gets: as much of a status bar down
+  /// that side of the display (the iPhone Duo's) as the card overlaps, as a system sheet's
+  /// content gets it. Measured from the card's own inset, not its position while paging, so
+  /// the bar's items do not move as a card slides past. (Left to UIKit, the content had none
+  /// until the card reached the display's edge, then all of it at once: the content narrowed by
+  /// 84 pt as the card arrived. UIKit no longer gives it any: see `ignoreSideStatusBar()`.)
+  private func navigationSideSafeArea(_ inset: CGFloat) -> CGFloat {
+    max(inset - sideInset, 0)
   }
 
   private static func scrollsVertically(_ scrollView: UIScrollView) -> Bool {
@@ -963,6 +1036,7 @@ final class CardSheetEngine {
       pagePosition = CGFloat(page)
       if page != currentIndex {
         currentIndex = page
+        adoptContent(scrollView(ofCard: page))
         onPageChange(page)
       }
     }

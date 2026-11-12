@@ -32,8 +32,8 @@ release stuttered (a frozen first frame, then a catch-up jump).
 | `_setAllowsInteractiveDismissWhenFullScreen:` | off: dismissal is the card's own drag |
 | `_setPreferredShadowOpacity:`, `_setLargeBackground:`, `dropShadowView` | invisible, unclipped sheet chrome |
 | `_confinedDimmingView` | the presenter's dimming, faded as a card is pulled away |
-| `UIScreen._displayCornerRadius` | the full-screen card's corners |
 | the detent resolution context's private methods (`_containerBounds`, …) | resolving SwiftUI's detents exactly as UIKit does |
+| `UINavigationController._verticalBarEligibleEdges`, in a runtime subclass | a card's navigation bar staying a sheet's where a status bar runs down the side of the display (iPhone Duo) |
 | a runtime subclass of the sheet, and of the sheet's hosting view | seeing SwiftUI's later writes without applying them; fixing margins inside a layout pass |
 
 Every selector is checked before it is called, and a missing one is logged and skipped. An

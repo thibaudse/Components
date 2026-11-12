@@ -5,6 +5,7 @@ import UIKit
 /// The content of the SwiftUI sheet that `.sheet(…, style: .card)` and `.sheet(items:selection:)` present: every page drawn as a card, where
 /// the engine says. Being the sheet's own content is what lets SwiftUI's presentation modifiers
 /// inside a page reach the sheet, where the engine reads them back.
+@available(iOS 26.0, *)
 struct CardSheetRoot<Page: Identifiable, Content: View>: View {
   let pages: [Page]
   let startIndex: Int
@@ -40,6 +41,7 @@ struct CardSheetRoot<Page: Identifiable, Content: View>: View {
 
 /// One card. Only this view reads the engine's per-frame values, so a moving card redraws its
 /// frame and shape, not its content.
+@available(iOS 26.0, *)
 private struct CardPage<Content: View>: View {
   let engine: CardSheetEngine
   let index: Int
@@ -47,7 +49,8 @@ private struct CardPage<Content: View>: View {
 
   var body: some View {
     let frame = engine.frame(for: index)
-    let radius = engine.cornerRadius
+    let top = Edge.Corner.Style.concentric(minimum: .fixed(engine.topCornerMinimum))
+    let bottom = Edge.Corner.Style.concentric(minimum: .fixed(engine.restingCornerRadius))
     content
       // The content's top safe area is UIKit's own: exactly as much of the status bar as the
       // card has risen into. At the bottom, the card adds the home indicator's. (No
@@ -56,13 +59,14 @@ private struct CardPage<Content: View>: View {
       .safeAreaPadding(.bottom, engine.contentBottomInset)
       .frame(width: frame.width, height: engine.contentHeight, alignment: .top)
       .background(.background)
-      // The visible part, clipped to the card's shape — it runs past the display's bottom by
-      // the corner radius when attached, so those corners are never seen.
+      // The visible part, clipped to the card's shape: each corner concentric with the
+      // display's own, as far as it is from it — a floating card's bottom ones, a full-screen
+      // card's all four. Attached, the card runs past the display's bottom far enough that its
+      // bottom corners are never seen.
       .frame(width: frame.width, height: engine.visibleHeight, alignment: .top)
-      .clipShape(UnevenRoundedRectangle(
-        topLeadingRadius: radius, bottomLeadingRadius: engine.bottomCornerRadius,
-        bottomTrailingRadius: engine.bottomCornerRadius, topTrailingRadius: radius,
-        style: .continuous
+      .clipShape(ConcentricRectangle(
+        topLeadingCorner: top, topTrailingCorner: top,
+        bottomLeadingCorner: bottom, bottomTrailingCorner: bottom
       ))
       .overlay(alignment: .top) {
         Capsule()
@@ -91,7 +95,7 @@ private struct CardSheetState: View {
       .frame(width: 1, height: 1)
       .accessibilityElement()
       .accessibilityIdentifier("cardSheet.state")
-      .accessibilityValue("top=\(Int((engine.cardTop + engine.dismissOffset).rounded())) left=\(Int(engine.frame(for: engine.currentIndex).minX.rounded())) page=\(engine.currentIndex) bottom=\(Int(engine.visibleBottom.rounded())) grabber=\(Int(engine.grabberOpacity)) scroll=\(Int(engine.contentScrolled.rounded()))")
+      .accessibilityValue("top=\(Int((engine.cardTop + engine.dismissOffset).rounded())) left=\(Int(engine.frame(for: engine.currentIndex).minX.rounded())) page=\(engine.currentIndex) bottom=\(Int(engine.visibleBottom.rounded())) grabber=\(Int(engine.grabberOpacity)) scroll=\(Int(engine.contentScrolled.rounded())) large=\(Int(engine.largeTop.rounded()))")
   }
 }
 

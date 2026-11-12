@@ -72,7 +72,7 @@ final class SheetTakeover {
     let selectedTop = selected.flatMap { id in detents.first { $0.identifier == id } }.flatMap(top(of:))
     let undimmedTop = undimmed.flatMap { id in detents.first { $0.identifier == id } }.flatMap(top(of:))
     return SheetConfiguration(
-      detentTops: tops.isEmpty ? [safeArea.top] : tops,
+      detentTops: tops.isEmpty ? [DetentContext.largeTop(safeArea: safeArea)] : tops,
       selectedTop: selectedTop,
       showsGrabber: grabber,
       cornerRadius: cornerRadius >= 0 && cornerRadius.isFinite ? cornerRadius : nil,
@@ -146,7 +146,8 @@ final class SheetTakeover {
 
 /// A detent resolution context with the private methods UIKit's own resolvers call on it — the
 /// medium detent asks for `_containerBounds`, for one. Found by implementing the private
-/// protocol's members and logging which are asked for.
+/// protocol's members and logging which are asked for, and the values compared with UIKit's own
+/// context (`SheetLayoutInfo`) on an iPhone 18 Pro and an iPhone Duo.
 final class DetentContext: NSObject, UISheetPresentationControllerDetentResolutionContext {
   let containerTraitCollection: UITraitCollection
   let maximumDetentValue: CGFloat
@@ -157,9 +158,18 @@ final class DetentContext: NSObject, UISheetPresentationControllerDetentResoluti
     self.bounds = bounds
     self.safeArea = safeArea
     containerTraitCollection = traits
-    // A large sheet fills the display between the status bar and the home indicator.
-    maximumDetentValue = bounds.height - safeArea.top - safeArea.bottom
+    // A large sheet fills the display from its top to the home indicator.
+    maximumDetentValue = bounds.height - Self.largeTop(safeArea: safeArea) - safeArea.bottom
   }
+
+  /// Where a `.large` sheet's top sits: under the status bar, and never nearer the top of the
+  /// display than 8 pt. The iPhone Duo puts its status bar down the side, leaving no top inset,
+  /// and UIKit's large sheet there floats 8 pt from the top and the sides (measured: 62 pt on an
+  /// iPhone 18 Pro, 8 pt on an iPhone Duo).
+  static func largeTop(safeArea: UIEdgeInsets) -> CGFloat {
+    max(safeArea.top, minimumTopInset)
+  }
+  private static let minimumTopInset: CGFloat = 8
 
   @objc var _isInverted: Bool { false }
   @objc var _isEdgeAttached: Bool { true }
@@ -168,10 +178,20 @@ final class DetentContext: NSObject, UISheetPresentationControllerDetentResoluti
   @objc var _containerTraitCollection: UITraitCollection { containerTraitCollection }
   @objc var _effectiveKeyboardFrame: CGRect { .zero }
   @objc var _fullHeightPresentedViewFrame: CGRect {
-    CGRect(x: 0, y: safeArea.top, width: bounds.width, height: bounds.height - safeArea.top)
+    let top = Self.largeTop(safeArea: safeArea)
+    // Kept off the status bar, a large sheet is attached to the sides; held off the display's
+    // top, it is inset from them as much.
+    let side = top > safeArea.top ? top - safeArea.top : 0
+    return CGRect(x: side, y: top, width: bounds.width - 2 * side, height: bounds.height - top)
   }
   @objc var _maximumDetentValue: CGFloat { maximumDetentValue }
   @objc var _fullDetentValue: CGFloat { maximumDetentValue }
+  // A display split into divisions (the iPhone Duo's resolvers ask for these): one division,
+  // the whole container, as UIKit's own context reports there.
+  @objc var _minimumDivisionDetentValue: CGFloat { maximumDetentValue }
+  @objc var _minimumActiveDivisionDetentValue: CGFloat { maximumDetentValue }
+  @objc var _divisionInsets: UIEdgeInsets { .zero }
+  @objc var _shouldAdaptToInactiveDivisions: Bool { false }
   @objc var _minimumSize: CGSize { .zero }
   @objc var _grabberSpacing: CGFloat { 0 }
   @objc var _grabberSize: CGSize { .zero }
