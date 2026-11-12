@@ -9,6 +9,7 @@ dependencies.
 | --- | --- | --- |
 | **CalendarKit** | A SwiftUI month grid, plus a single-row inline calendar. It places the days; you draw them, and the chrome around them. | iOS 18+, macOS 14+ |
 | **AdaptiveSheetKit** | `sheet` with the detent taken care of: a sheet as tall as its content, that resizes with it — through scroll views, the keyboard, and pushes in a `NavigationStack`. | iOS 18+ |
+| **CardSheetKit** | Cards you page through sideways, resting at a detent, that one drag takes to full screen and on into the content — and back down, and away. Overloads of `sheet`; SwiftUI's presentation modifiers keep working. Built on private UIKit API. | iOS 26+ |
 
 ## Installation
 
@@ -188,6 +189,72 @@ animating.
 unconditionally; guard the call sites. The detent arithmetic is outside the guard, which is
 how it stays testable under `swift test` on macOS.
 
+## CardSheetKit
+
+Apple Sports' game card as a SwiftUI presentation. The card rests at its smallest detent, floating
+below `.large`; one drag takes it to full screen and carries straight on into the content's
+scrolling, then back down and away, without the finger lifting. Several cards sit side by side,
+the neighbours peeking in the margins, to swipe between at any height but full screen:
+
+```swift
+import CardSheetKit
+import SwiftUI
+
+struct Scores: View {
+  let games: [Game]
+  @State private var selectedGame: Game.ID?
+
+  var body: some View {
+    List(games) { game in
+      Button(game.title) { selectedGame = game.id }
+    }
+    .sheet(items: games, selection: $selectedGame) { game in
+      GameView(game)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+  }
+}
+```
+
+`selection` follows the card on screen and is set to `nil` on dismissal. A single card is
+`sheet(isPresented:style:onDismiss:content:)` or `sheet(item:style:onDismiss:content:)` with
+`style: .card`: SwiftUI's own overloads have exactly their other parameters, so the style keeps
+every other sheet a system sheet.
+
+It is still SwiftUI's sheet, so the content's `presentationDetents`, `presentationDragIndicator`,
+`presentationCornerRadius`, `presentationBackgroundInteraction`,
+`presentationContentInteraction` and `interactiveDismissDisabled` are read back from it. Three
+modifiers have no system-sheet equivalent: `presentationSnapping(_:)`,
+`presentationExpandsToFullScreen(_:)` and `presentationNeighbourPeek(_:)`. The environment's
+`presentationExpansion` reads the card's height, from 0 at rest to 1 full screen. Content in a
+`NavigationStack` behaves as on a full-screen screen, its bar and large title holding still from
+`.large` to full screen.
+
+### Private API
+
+The card is drawn by SwiftUI and moved by an engine that takes over the
+`UISheetPresentationController` SwiftUI configures. That takes private UIKit: a full-screen sheet,
+its chrome and dimming, the display's corner radius, and the private methods UIKit's detent
+resolvers call. Every selector is checked before use, and a missing one is logged and skipped
+rather than crashing, but **none of it would pass App Review**. The DocC article *How it works*
+lists each call and what it is for.
+
+### Lab app and UI tests
+
+`Examples/CardSheetLab` is an app with every option behind a settings button, and UI tests that
+drive the real gestures: paging, the middle state, dragging into the content, flicks, snapping,
+dismissal, and a `NavigationStack`'s bar and title. It depends on the package by path:
+
+```sh
+cd Examples/CardSheetLab
+xcodegen generate   # brew install xcodegen
+xcodebuild test -scheme CardSheetLab -parallel-testing-enabled NO \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+```
+
+The suite passes on iOS 26.5, 27.0 and 27.2.
+
 ## Documentation
 
 Each component carries a DocC catalog with a landing page, guides, and API reference.
@@ -198,7 +265,8 @@ xcodebuild docbuild -scheme Components -destination 'generic/platform=iOS'
 ```
 
 CalendarKit's catalog covers: **Getting started**, **Theming**, and **Working with
-DateComponents**. AdaptiveSheetKit's covers: **Getting started**.
+DateComponents**. AdaptiveSheetKit's covers: **Getting started**. CardSheetKit's covers:
+**Getting started** and **How it works**.
 
 ## Repository layout
 
@@ -217,9 +285,18 @@ Sources/
     View+AdaptiveSheet+Previews.swift  the sizing cases, one preview each
     Internal/                        measurement, reading order, UIKit detent controller
     AdaptiveSheetKit.docc/           landing page and guide
+  CardSheetKit/
+    View+CardSheet.swift             the public View modifiers
+    View+CardSheet+Previews.swift    the presenters, one preview each
+    Internal/                        the engine, the sheet takeover, private API
+    CardSheetKit.docc/               landing page and guides
+  CardSheetKitObjC/                  catches Objective-C exceptions for CardSheetKit
 Tests/
   CalendarKitTests/
   AdaptiveSheetKitTests/
+  CardSheetKitTests/
+Examples/
+  CardSheetLab/                      CardSheetKit's lab app and UI tests (XcodeGen)
 ```
 
 ## Adding a component

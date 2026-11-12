@@ -17,6 +17,10 @@ let package = Package(
     .library(
       name: "CalendarKit",
       targets: ["CalendarKit"]
+    ),
+    .library(
+      name: "CardSheetKit",
+      targets: ["CardSheetKit"]
     )
   ],
   targets: [
@@ -36,6 +40,18 @@ let package = Package(
     .testTarget(
       name: "CalendarKitTests",
       dependencies: ["CalendarKit"]
+    ),
+    .target(
+      name: "CardSheetKit",
+      dependencies: ["CardSheetKitObjC"]
+    ),
+    // Swift cannot catch an Objective-C exception, and private UIKit can raise one.
+    .target(
+      name: "CardSheetKitObjC"
+    ),
+    .testTarget(
+      name: "CardSheetKitTests",
+      dependencies: ["CardSheetKit"]
     )
   ]
 )
